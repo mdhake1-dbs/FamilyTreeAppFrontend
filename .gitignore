@@ -1,0 +1,9 @@
+# Dependency directories
+node_modules/
+
+# Build / generated platforms
+platforms/
+plugins/
+android/
+
+helper_scripts/github_credentials.env

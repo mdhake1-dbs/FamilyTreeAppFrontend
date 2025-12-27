@@ -1,0 +1,567 @@
+            resetEventForm();
+            loadEvents();
+        } else {
+            showEventMessage(res.error || 'Error updating event', 'error');
+        }
+    } catch (err) {
+        showEventMessage('Connection error: ' + err.message, 'error');
+    }
+}
+
+async function loadEvents() {
+    const container = document.getElementById('eventsList');
+    container.innerHTML = '<div class="loading">Loading events...</div>';
+    
+    try {
+        const r = await fetch(`${CONFIG.API_URL}/events`, {
+            headers: {'Authorization': `Bearer ${authToken}`}
+        });
+        const res = await r.json();
+        
+        if (!res.success) {
+            container.innerHTML = `<div class="message error">${res.error || 'Error loading events'}</div>`;
+            return;
+        }
+        
+        displayEvents(res.data || []);
+    } catch (err) {
+        container.innerHTML = `<div class="message error">Connection error: ${err.message}</div>`;
+    }
+}
+
+function displayEvents(events) {
+    const container = document.getElementById('eventsList');
+    
+    if (!events.length) {
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No events found.</div>';
+        return;
+    }
+    
+    let html = '';
+    events.forEach(ev => {
+        const dateText = ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '-';
+        
+        html += `
+            <div class="list-item">
+                <div class="list-item-header">
+                    <div class="list-item-title">${escapeHtml(ev.title || '')}</div>
+                </div>
+                <div class="list-item-details">
+                    <div><strong>Person:</strong> ${escapeHtml(ev.person_name || '')}</div>
+                    <div><strong>Date:</strong> ${dateText}</div>
+                    ${ev.place ? `<div><strong>Place:</strong> ${escapeHtml(ev.place)}</div>` : ''}
+                    ${ev.description ? `<div>${escapeHtml(ev.description)}</div>` : ''}
+                </div>
+                <div class="list-item-actions">
+                    <button class="btn-delete btn-sm" onclick="deleteEvent(${ev.id})">Delete</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+async function deleteEvent(id) {
+    if (!confirm('Delete this event?')) return;
+    
+    try {
+        const r = await fetch(`${CONFIG.API_URL}/events/${id}`, {
+            method: 'DELETE',
+            headers: {'Authorization': `Bearer ${authToken}`}
+        });
+        const res = await r.json();
+        
+        if (res.success) {
+            showEventMessage('Event deleted successfully', 'success');
+            loadEvents();
+        } else {
+            showEventMessage(res.error || 'Error deleting event', 'error');
+        }
+    } catch (err) {
+        showEventMessage('Connection error: ' + err.message, 'error');
+    }
+}
+
+function resetEventForm() {
+    editingEventId = null;
+    document.getElementById('eventForm').reset();
+    document.getElementById('eventId').value = '';
+    document.getElementById('eventSubmitBtn').textContent = 'Add Event';
+}
+
+function showEventMessage(msg, type) {
+    const box = document.getElementById('eventMessage');
+    box.textContent = msg;
+    box.className = 'message ' + (type === 'error' ? 'error' : 'success');
+    box.style.display = 'block';
+    window.scrollTo({top: 0, behavior: 'smooth'});
+    setTimeout(() => box.style.display = 'none', 4000);
+}
+JS4EOF
+
+#1766538072
+echo "✓ JavaScript Part 4 created (Events)"
+#1766538072
+echo ""
+#1766538072
+echo "======================================"
+#1766538072
+echo "✅ ALL FILES CREATED SUCCESSFULLY!"
+#1766538072
+echo "======================================"
+#1766538089
+gedit www/js/app.js 
+#1766538317
+gedit 
+#1766538330
+cat > www/index.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Family Tree Manager</title>
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+    <!-- AUTH SCREEN -->
+    <div id="authScreen" class="auth-container">
+        <div class="auth-header">
+            <div class="logo">👨‍👩‍👧‍👦</div>
+            <h1 class="auth-title">Family Tree</h1>
+            <p class="auth-subtitle">Manage Your Family History</p>
+        </div>
+        
+        <div id="authMessage" class="message"></div>
+
+        <div class="auth-tabs">
+            <button id="tabLogin" class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+            <button id="tabRegister" class="auth-tab" onclick="switchAuthTab('register')">Register</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input id="loginUsername" type="text" placeholder="Enter username" required />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input id="loginPassword" type="password" placeholder="Enter password" required />
+            </div>
+            <button type="submit" class="btn-primary btn-full">Login</button>
+        </form>
+
+        <form id="registerForm" class="auth-form hidden">
+            <div class="form-group">
+                <label>Username *</label>
+                <input id="regUsername" type="text" placeholder="Choose username" required />
+            </div>
+            <div class="form-group">
+                <label>Password * (min 6)</label>
+                <input id="regPassword" type="password" placeholder="Choose password" required minlength="6" />
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input id="regEmail" type="email" placeholder="Enter email (optional)" />
+            </div>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input id="regFullName" type="text" placeholder="Enter full name (optional)" />
+            </div>
+            <button type="submit" class="btn-primary btn-full">Register</button>
+        </form>
+    </div>
+
+    <!-- APP SCREEN -->
+    <div id="appScreen" class="hidden app-wrapper">
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+            <button class="menu-btn" onclick="toggleMobileMenu()">
+                <span class="menu-icon">☰</span>
+            </button>
+            <div class="header-title">Family Tree</div>
+            <button class="profile-btn" onclick="toggleProfile()">
+                <span class="profile-icon">👤</span>
+            </button>
+        </div>
+
+        <!-- Mobile Navigation -->
+        <div id="mobileNav" class="mobile-nav hidden">
+            <div class="mobile-nav-header">
+                <span id="mobileUserName" class="mobile-user-name"></span>
+                <button class="close-btn" onclick="toggleMobileMenu()">✕</button>
+            </div>
+            <nav class="mobile-nav-menu">
+                <button class="nav-item" onclick="showHome(); toggleMobileMenu();">
+                    <span class="nav-icon">🏠</span> Home
+                </button>
+                <button class="nav-item" onclick="showAddPerson(); toggleMobileMenu();">
+                    <span class="nav-icon">➕</span> Add Person
+                </button>
+                <button class="nav-item" onclick="showPeople(); toggleMobileMenu();">
+                    <span class="nav-icon">👥</span> People
+                </button>
+                <button class="nav-item" onclick="showAddRelationship(); toggleMobileMenu();">
+                    <span class="nav-icon">🔗</span> Add Relationship
+                </button>
+                <button class="nav-item" onclick="showViewRelationships(); toggleMobileMenu();">
+                    <span class="nav-icon">📊</span> Relationships
+                </button>
+                <button class="nav-item" onclick="showAddEvent(); toggleMobileMenu();">
+                    <span class="nav-icon">📅</span> Add Event
+                </button>
+                <button class="nav-item" onclick="showViewEvents(); toggleMobileMenu();">
+                    <span class="nav-icon">📋</span> Events
+                </button>
+                <button class="nav-item logout-item" onclick="logout();">
+                    <span class="nav-icon">🚪</span> Logout
+                </button>
+            </nav>
+        </div>
+
+        <div class="app-container">
+            <!-- Main Content -->
+            <div class="main-content">
+                <div id="messageBox" class="message"></div>
+
+                <!-- HOMEPAGE -->
+                <div id="homePage" class="section">
+                    <div class="home-card">
+                        <div class="home-icon">👨‍👩‍👧‍👦</div>
+                        <h2>Welcome to Your Family Tree</h2>
+                        <p class="home-text">
+                            Manage your family members, record relationships, track events, and preserve your family history.
+                        </p>
+                        <div class="home-actions">
+                            <button class="btn-primary" onclick="showAddPerson()">
+                                <span class="btn-icon">➕</span> Add Person
+                            </button>
+                            <button class="btn-secondary" onclick="showPeople()">
+                                <span class="btn-icon">👥</span> View People
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PROFILE SECTION -->
+                <div id="profileSection" class="hidden section">
+                    <div class="card">
+                        <h2 class="card-header">Edit Profile</h2>
+                        <div id="profileMsg" class="message"></div>
+                        <form id="profileForm">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input id="profileFullName" type="text" />
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input id="profileEmail" type="email" />
+                            </div>
+                            <div class="form-group">
+                                <label>New Password (leave blank to keep current)</label>
+                                <input id="profilePassword" type="password" />
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn-primary" onclick="saveProfile()">Save</button>
+                                <button type="button" class="btn-secondary" onclick="toggleProfile()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ADD/EDIT PERSON FORM -->
+                <div id="personFormSection" class="section hidden">
+                    <div class="card">
+                        <h2 id="formTitle" class="card-header">Add New Person</h2>
+                        <form id="personForm">
+                            <input type="hidden" id="personId" />
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Given Name *</label>
+                                    <input id="givenName" type="text" required />
+                                </div>
+                                <div class="form-group">
+                                    <label>Family Name *</label>
+                                    <input id="familyName" type="text" required />
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Gender</label>
+                                <select id="gender">
+                                    <option value="">Select...</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Life Status</label>
+                                    <select id="lifeStatus" onchange="toggleDeathDate()">
+                                        <option value="alive">Alive</option>
+                                        <option value="deceased">Deceased</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Birth Date</label>
+                                    <input id="birthDate" type="date" />
+                                </div>
+                            </div>
+
+                            <div id="deathDateGroup" class="form-group hidden">
+                                <label>Death Date</label>
+                                <input id="deathDate" type="date" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Birth Place</label>
+                                <input id="birthPlace" type="text" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Biography</label>
+                                <textarea id="bio" rows="4"></textarea>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" id="submitBtn" class="btn-primary">Add Person</button>
+                                <button type="button" class="btn-secondary" onclick="cancelAddEdit()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- PEOPLE LIST -->
+                <div id="peopleSection" class="section hidden">
+                    <div class="section-header">
+                        <h2>People</h2>
+                        <div class="section-actions">
+                            <button class="btn-secondary btn-sm" onclick="loadPeople()">Refresh</button>
+                            <button class="btn-primary btn-sm" onclick="showAddPerson()">Add Person</button>
+                        </div>
+                    </div>
+                    <div id="peopleList" class="list-container"></div>
+                </div>
+
+                <!-- RELATIONSHIPS SECTION -->
+                <div id="relationshipsSection" class="section hidden">
+                    <div class="card">
+                        <h2 class="card-header">Relationships</h2>
+                        <div id="relMessage" class="message"></div>
+
+                        <form id="relationshipForm">
+                            <input type="hidden" id="relationshipId" />
+
+                            <div class="form-group">
+                                <label>Person</label>
+                                <select id="relPerson1" required>
+                                    <option value="">Select person...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Relation Type</label>
+                                <select id="relType" required>
+                                    <option value="">Select relation...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Related To</label>
+                                <select id="relPerson2" required>
+                                    <option value="">Select person...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" id="relSubmitBtn" class="btn-primary">Add Relationship</button>
+                                <button type="button" class="btn-secondary" onclick="resetRelationshipForm()">Clear</button>
+                            </div>
+                        </form>
+
+                        <div id="relationshipsList" class="list-container"></div>
+                    </div>
+                </div>
+
+                <!-- EVENTS SECTION -->
+                <div id="eventsSection" class="section hidden">
+                    <div class="card">
+                        <h2 class="card-header">Events</h2>
+                        <div id="eventMessage" class="message"></div>
+
+                        <form id="eventForm">
+                            <input type="hidden" id="eventId" />
+
+                            <div class="form-group">
+                                <label>Person</label>
+                                <select id="eventPerson" required>
+                                    <option value="">Select person...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Title *</label>
+                                <input id="eventTitle" type="text" required />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input id="eventDate" type="date" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Place</label>
+                                <input id="eventPlace" type="text" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea id="eventDescription" rows="3"></textarea>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" id="eventSubmitBtn" class="btn-primary">Add Event</button>
+                                <button type="button" class="btn-secondary" onclick="resetEventForm()">Clear</button>
+                            </div>
+                        </form>
+
+                        <div id="eventsList" class="list-container"></div>
+                    </div>
+                </div>
+
+            </div> <!-- /main-content -->
+        </div> <!-- /app-container -->
+    </div> <!-- /appScreen -->
+
+    <script type="text/javascript" src="cordova.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
+HTMLEOF
+
+#1766538330
+echo "✅ index.html created at: www/index.html"
+#1766538337
+cd www/
+#1766538337
+ls
+#1766538344
+gedit index.html 
+#1766538350
+cd ../
+#1766538352
+ls
+#1766538364
+gedit www/js/config.js 
+#1766538581
+sudo ufw status
+#1766538595
+sudo ufw allow 80
+#1766538599
+sudo ufw status
+#1766538803
+# Verify all files exist
+#1766538803
+ls www/index.html && echo "✓ HTML exists"
+#1766538803
+ls www/css/styles.css && echo "✓ CSS exists"
+#1766538803
+ls www/js/config.js && echo "✓ Config exists"
+#1766538803
+ls www/js/app.js && echo "✓ JavaScript exists"
+#1766538852
+mv www/css/style.css www/css/styles.css 
+#1766538906
+ls
+#1766538919
+ls 
+#1766538948
+tree -D 
+#1766538960
+tree -d -L1 
+#1766538963
+tree -d -L 1 
+#1766538968
+tree -L 1 
+#1766538989
+tree -L 2
+#1766538995
+cd www/
+#1766538996
+tree
+#1766539005
+rm -rf js/oldapp.js 
+#1766539007
+reset
+#1766539009
+tree
+#1766539023
+cd ../
+#1766539029
+tree -L 1 
+#1766539161
+gedit www/js/app.js 
+#1766539174
+gedit www/js/config.js 
+#1766539286
+cordova build android
+#1766539306
+cordova run android --device
+#1766539878
+gedit www/js/config.js 
+#1766539891
+cordova build android
+#1766539902
+cordova run android --device
+#1766552821
+npm install -g @ionic/cli
+#1766552853
+sudo npm install -g @ionic/cli
+#1766552935
+ionic --version
+#1766553007
+adb --version
+#1766553961
+sudo npm install @capacitor/core @capacitor/cli
+#1766553979
+npx cap init
+#1766554074
+npx cap add android
+#1766554097
+sudo npm install @capacitor/android
+#1766554101
+npx cap add android
+#1766554133
+npx cap open android
+#1766554207
+exit
+#1766554298
+cd ~/family-tree-vault/
+#1766554330
+export CAPACITOR_ANDROID_STUDIO_PATH="/snap/bin/android-studio"
+#1766554336
+npx cap open android
+#1766554410
+ionic serve
+#1766554420
+ionic init
+#1766554504
+ionic serve
+#1766554523
+ionic start familyvault blank --type=vanilla
+#1766554546
+ionic start --list
+#1766599047
+exit
+#1766599075
+HISTTIMEFORMAT="%F %T  "
+#1766599078
+history
