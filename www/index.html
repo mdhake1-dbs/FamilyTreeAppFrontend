@@ -72,8 +72,11 @@
             </button>
         </div>
 
-        <!-- Gmail-Style Partial Sidebar -->
-        <div id="mobileNav" class="mobile-nav hidden" onclick="event.target === this && toggleMobileMenu()">
+        <!-- Sidebar Overlay -->
+        <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleMobileMenu()"></div>
+
+        <!-- Sidebar -->
+        <div id="mobileNav" class="mobile-nav hidden">
             <div class="mobile-nav-header">
                 <span id="mobileUserName" class="mobile-user-name">User</span>
                 <button class="close-btn" type="button" onclick="toggleMobileMenu()">✕</button>
@@ -224,7 +227,7 @@
                 <div class="section-header">
                     <h2>People</h2>
                     <div class="section-actions">
-                        <button class="btn-secondary btn-sm" type="button" onclick="loadPeople()">🔄</button>
+                        <button class="btn-secondary btn-sm" type="button" onclick="loadPeople()">Refresh</button>
                         <button class="btn-primary btn-sm" type="button" onclick="showAddPerson()">+ Add</button>
                     </div>
                 </div>

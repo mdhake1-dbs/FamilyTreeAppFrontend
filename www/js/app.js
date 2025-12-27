@@ -1,3 +1,18 @@
+// Fixed toggle function with overlay
+function toggleMobileMenu() {
+    const nav = document.getElementById('mobileNav');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    nav.classList.toggle('hidden');
+    overlay.classList.toggle('active');
+    
+    // Prevent body scroll when menu is open
+    if (!nav.classList.contains('hidden')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
 // Family Tree Mobile Application
 let authToken = localStorage.getItem('familytree_token');
 let currentUser = null;
@@ -40,9 +55,6 @@ function setupEventListeners() {
     document.getElementById('relPerson2').addEventListener('change', handleRelPersonSelectChange);
 }
 
-function toggleMobileMenu() {
-    document.getElementById('mobileNav').classList.toggle('hidden');
-}
 
 function switchAuthTab(tab) {
     document.getElementById('authMessage').style.display = 'none';

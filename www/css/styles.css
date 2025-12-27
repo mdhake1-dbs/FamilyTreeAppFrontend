@@ -1,4 +1,4 @@
-/* Modern Family Tree App - Rich UI */
+/* Modern Family Tree App - Fixed UI */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 * {
@@ -279,12 +279,13 @@ textarea { resize: vertical; min-height: 100px; }
     background: var(--bg);
 }
 
-/* Modern Mobile Header */
+/* FIXED: Modern Mobile Header with Safe Area */
 .mobile-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1.25rem;
+    padding-top: max(1rem, env(safe-area-inset-top)); /* Fix for notch */
     background: white;
     color: var(--text);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -323,7 +324,26 @@ textarea { resize: vertical; min-height: 100px; }
     background-clip: text;
 }
 
-/* Gmail-Style Partial Sidebar */
+/* FIXED: Sidebar Overlay - No Grey Spots */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 199;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* FIXED: Gmail-Style Sidebar */
 .mobile-nav {
     position: fixed;
     top: 0;
@@ -343,31 +363,12 @@ textarea { resize: vertical; min-height: 100px; }
     transform: translateX(0);
 }
 
-/* Sidebar Overlay */
-.mobile-nav::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 80%;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.5);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-    z-index: -1;
-}
-
-.mobile-nav:not(.hidden)::after {
-    opacity: 1;
-    pointer-events: all;
-}
-
 .mobile-nav-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 1.5rem;
+    padding-top: max(1.5rem, env(safe-area-inset-top)); /* Fix for notch */
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
     color: white;
     min-height: 80px;
@@ -453,12 +454,6 @@ textarea { resize: vertical; min-height: 100px; }
     box-shadow: var(--shadow);
     margin-bottom: 1rem;
     border: 1px solid var(--border);
-    transition: all 0.3s ease;
-}
-
-.card:active {
-    box-shadow: var(--shadow-lg);
-    transform: translateY(-2px);
 }
 
 .card-header {
