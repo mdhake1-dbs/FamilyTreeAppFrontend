@@ -1,0 +1,25 @@
+Add this after the Birth Place field in www/index.html (around line 280):
+
+<!-- Photo Section -->
+<div class="form-group">
+    <label>Photo (Optional)</label>
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <button type="button" class="btn-primary btn-sm" onclick="takePhoto()" style="flex: 1;">
+            📷 Take Photo
+        </button>
+        <button type="button" class="btn-secondary btn-sm" onclick="selectFromGallery()" style="flex: 1;">
+            🖼️ Gallery
+        </button>
+    </div>
+    <img id="photoPreview" style="display: none; width: 100%; max-width: 300px; border-radius: 0.5rem; margin-top: 0.5rem;" />
+</div>
+
+<!-- Location Button -->
+<div class="form-group">
+    <label>Birth Place</label>
+    <input id="birthPlace" type="text" placeholder="City, Country" />
+    <button type="button" class="btn-secondary btn-sm" onclick="getCurrentLocation()" style="margin-top: 0.5rem; width: 100%;">
+        📍 Use Current Location
+    </button>
+</div>
+

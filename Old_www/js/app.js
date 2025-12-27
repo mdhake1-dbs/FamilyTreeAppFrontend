@@ -1,3 +1,18 @@
+// Fixed toggle function with overlay
+function toggleMobileMenu() {
+    const nav = document.getElementById('mobileNav');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    nav.classList.toggle('hidden');
+    overlay.classList.toggle('active');
+    
+    // Prevent body scroll when menu is open
+    if (!nav.classList.contains('hidden')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
 // Family Tree Mobile Application
 let authToken = localStorage.getItem('familytree_token');
 let currentUser = null;
@@ -9,14 +24,14 @@ let editingEventId = null;
 document.addEventListener('deviceready', onDeviceReady, false);
 
 function onDeviceReady() {
-    
+    debugLog('Cordova device ready');
     if (navigator.splashscreen) navigator.splashscreen.hide();
     initializeApp();
 }
 
 // Browser fallback
 if (!window.cordova) {
-
+    debugLog('Running in browser mode');
     document.addEventListener('DOMContentLoaded', initializeApp);
 }
 
@@ -67,7 +82,7 @@ async function checkAuth() {
         localStorage.removeItem('familytree_token');
         return false;
     } catch (err) {
-        
+        debugLog('Auth check failed:', err);
         return false;
     }
 }
@@ -99,49 +114,30 @@ function hideAllMainSections() {
 
 async function onLoginSubmit(e) {
     e.preventDefault();
-
     const username = document.getElementById('loginUsername').value;
     const password = document.getElementById('loginPassword').value;
-
+    
     try {
         const r = await fetch(`${CONFIG.API_URL}/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username, password})
         });
         const res = await r.json();
-
-        if (!res.success) {
+        
+        if (res.success) {
+            authToken = res.token;
+            currentUser = res.user;
+            localStorage.setItem('familytree_token', authToken);
+            showApp();
+            showHome();
+        } else {
             showAuthMessage(res.error, 'error');
-            return;
         }
-
-        authToken = res.token;
-        localStorage.setItem('familytree_token', authToken);
-
-        // Fetch full user profile (includes profile_photo)
-        const meResp = await fetch(`${CONFIG.API_URL}/auth/me`, {
-            headers: { Authorization: `Bearer ${authToken}` }
-        });
-        const meData = await meResp.json();
-
-        if (meData.success) {
-            currentUser = meData.user;
-
-            if (currentUser.profile_photo) {
-                document.getElementById('profileAvatar').src =
-                    imageUrl(currentUser.profile_photo);
-            }
-        }
-
-        showApp();
-        showHome();
-
     } catch (err) {
         showAuthMessage('Connection error: ' + err.message, 'error');
     }
 }
-
 
 async function onRegisterSubmit(e) {
     e.preventDefault();
@@ -219,30 +215,6 @@ function toggleProfile() {
     }
 }
 
-// Fixed toggle function with overlay
-function toggleMobileMenu() {
-    const nav = document.getElementById('mobileNav');
-    const overlay = document.getElementById('sidebarOverlay');
-    
-    nav.classList.toggle('hidden');
-    overlay.classList.toggle('active');
-    
-    // Prevent body scroll when menu is open
-    if (!nav.classList.contains('hidden')) {
-        document.body.style.overflow = 'hidden';
-    } else {
-        document.body.style.overflow = '';
-    }
-}
-
-function changeProfilePhoto() {
-    takePhoto(uri => {
-        uploadImage(uri, '/users/profile-photo', res => {
-            document.getElementById('profileAvatar').src = imageUrl(res.profile_photo);
-        });
-    });
-}
-
 async function saveProfile() {
     const data = {
         full_name: document.getElementById('profileFullName').value,
@@ -284,48 +256,6 @@ async function saveProfile() {
         pm.style.display = 'block';
     }
 }
-
-function imageUrl(path) {
-    if (!path) return 'img/avatar-placeholder.png';
-    return CONFIG.API_URL.replace('/api', '') + '/' + path;
-}
-
-function takePhoto(callback) {
-    if (!navigator.camera) {
-        alert('Camera not available');
-        return;
-    }
-    navigator.camera.getPicture(
-        uri => callback(uri),
-        err => alert('Camera error'),
-        {
-            quality: 70,
-            destinationType: Camera.DestinationType.FILE_URI,
-            encodingType: Camera.EncodingType.JPEG,
-            correctOrientation: true
-        }
-    );
-}
-
-function uploadImage(fileURI, endpoint, onSuccess) {
-    const options = new FileUploadOptions();
-    options.fileKey = 'photo';
-    options.fileName = fileURI.split('/').pop();
-    options.mimeType = 'image/jpeg';
-    options.headers = {
-        Authorization: `Bearer ${authToken}`
-    };
-
-    const ft = new FileTransfer();
-    ft.upload(
-        fileURI,
-        CONFIG.API_URL + endpoint,
-        res => onSuccess(JSON.parse(res.response)),
-        () => alert('Upload failed'),
-        options
-    );
-}
-
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -435,32 +365,36 @@ async function loadPeople() {
 
 function displayPeople(people) {
     const container = document.getElementById('peopleList');
-    container.innerHTML = '';
-
+    
+    if (!people || people.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No people found. Click "Add Person" to create one.</div>';
+        return;
+    }
+    
+    let html = '';
     people.forEach(p => {
-        container.innerHTML += `
-            <div class="list-item person-item">
-                <div class="person-photo-wrapper">
-                    <img src="${imageUrl(p.photo)}" class="person-photo"/>
-                    <button class="camera-btn small" onclick="changePersonPhoto(${p.id})">📷</button>
+        const name = `${p.given_name} ${p.family_name}`;
+        const birthDate = p.birth_date ? new Date(p.birth_date).toLocaleDateString() : 'N/A';
+        
+        html += `
+            <div class="list-item">
+                <div class="list-item-header">
+                    <div class="list-item-title">${escapeHtml(name)}</div>
                 </div>
-
-                <div class="list-item-content">
-                    <div class="list-item-title">${escapeHtml(p.given_name)} ${escapeHtml(p.family_name)}</div>
-                    <div class="list-item-details">
-                        <div><strong>Gender:</strong> ${p.gender || 'N/A'}</div>
-                        <div><strong>Birth:</strong> ${p.birth_date || 'N/A'}</div>
-                    </div>
+                <div class="list-item-details">
+                    <div><strong>Birth:</strong> ${birthDate}</div>
+                    <div><strong>Place:</strong> ${escapeHtml(p.birth_place || 'N/A')}</div>
+                    <div><strong>Gender:</strong> ${escapeHtml(p.gender || 'N/A')}</div>
+                </div>
+                <div class="list-item-actions">
+                    <button class="btn-primary btn-sm" onclick="editPerson(${p.id})">Edit</button>
+                    <button class="btn-delete btn-sm" onclick="deletePerson(${p.id}, '${escapeJs(name)}')">Delete</button>
                 </div>
             </div>
         `;
     });
-}
-
-function changePersonPhoto(id) {
-    takePhoto(uri => {
-        uploadImage(uri, `/people/${id}/photo`, () => loadPeople());
-    });
+    
+    container.innerHTML = html;
 }
 
 async function editPerson(id) {
@@ -987,4 +921,115 @@ function showEventMessage(msg, type) {
     box.style.display = 'block';
     window.scrollTo({top: 0, behavior: 'smooth'});
     setTimeout(() => box.style.display = 'none', 4000);
+}
+
+// ===== CAMERA PLUGIN =====
+let currentPhotoData = null;
+
+function takePhoto() {
+    if (!navigator.camera) {
+        alert('Camera plugin not available');
+        return;
+    }
+    
+    navigator.camera.getPicture(
+        function(imageData) {
+            currentPhotoData = imageData;
+            const photoPreview = document.getElementById('photoPreview');
+            if (photoPreview) {
+                photoPreview.src = "data:image/jpeg;base64," + imageData;
+                photoPreview.style.display = 'block';
+            }
+            showMessage('Photo captured successfully', 'success');
+        },
+        function(error) {
+            showMessage('Camera error: ' + error, 'error');
+        },
+        {
+            quality: 75,
+            destinationType: Camera.DestinationType.DATA_URL,
+            sourceType: Camera.PictureSourceType.CAMERA,
+            encodingType: Camera.EncodingType.JPEG,
+            targetWidth: 800,
+            targetHeight: 800,
+            correctOrientation: true
+        }
+    );
+}
+
+function selectFromGallery() {
+    if (!navigator.camera) {
+        alert('Camera plugin not available');
+        return;
+    }
+    
+    navigator.camera.getPicture(
+        function(imageData) {
+            currentPhotoData = imageData;
+            const photoPreview = document.getElementById('photoPreview');
+            if (photoPreview) {
+                photoPreview.src = "data:image/jpeg;base64," + imageData;
+                photoPreview.style.display = 'block';
+            }
+            showMessage('Photo selected successfully', 'success');
+        },
+        function(error) {
+            showMessage('Gallery error: ' + error, 'error');
+        },
+        {
+            quality: 75,
+            destinationType: Camera.DestinationType.DATA_URL,
+            sourceType: Camera.PictureSourceType.PHOTOLIBRARY,
+            encodingType: Camera.EncodingType.JPEG,
+            targetWidth: 800,
+            targetHeight: 800
+        }
+    );
+}
+
+// ===== GEOLOCATION PLUGIN =====
+function getCurrentLocation() {
+    if (!navigator.geolocation) {
+        alert('Geolocation plugin not available');
+        return;
+    }
+    
+    showMessage('Getting location...', 'success');
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude.toFixed(6);
+            const lon = position.coords.longitude.toFixed(6);
+            const accuracy = position.coords.accuracy.toFixed(0);
+            
+            const locationInput = document.getElementById('birthPlace');
+            if (locationInput) {
+                locationInput.value = `Lat: ${lat}, Lon: ${lon} (±${accuracy}m)`;
+            }
+            
+            showMessage(`Location captured: ${lat}, ${lon}`, 'success');
+        },
+        function(error) {
+            let errorMsg = 'Location error: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg += 'Permission denied';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg += 'Position unavailable';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg += 'Timeout';
+                    break;
+                default:
+                    errorMsg += error.message;
+            }
+            showMessage(errorMsg, 'error');
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
 }

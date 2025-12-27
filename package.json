@@ -26,9 +26,7 @@
     "plugins": {
       "cordova-plugin-statusbar": {},
       "cordova-plugin-splashscreen": {},
-      "cordova-plugin-camera": {
-        "ANDROIDX_CORE_VERSION": "1.6.+"
-      },
+      "cordova-plugin-camera": {},
       "cordova-plugin-geolocation": {
         "GPS_REQUIRED": "true"
       }

@@ -131,38 +131,31 @@
                 </div>
             </div>
 
-            <!-- PROFILE SECTION (UPDATED) -->
-		<div id="profileSection" class="hidden section">
-		    <div class="card profile-card">
-			<div class="profile-avatar-wrapper">
-			    <img id="profileAvatar" class="profile-avatar" src="img/avatar-placeholder.png" />
-			    <button class="camera-btn" type="button" onclick="changeProfilePhoto()">📷</button>
-			</div>
-
-			<h2 class="card-header">Edit Profile</h2>
-			<div id="profileMsg" class="message"></div>
-
-			<form id="profileForm" onsubmit="event.preventDefault();">
-			    <div class="form-group">
-				<label>Full Name</label>
-				<input id="profileFullName" type="text" />
-			    </div>
-			    <div class="form-group">
-				<label>Email</label>
-				<input id="profileEmail" type="email" />
-			    </div>
-			    <div class="form-group">
-				<label>New Password</label>
-				<input id="profilePassword" type="password" />
-			    </div>
-			    <div class="form-actions">
-				<button type="button" class="btn-primary" onclick="saveProfile()">Save Changes</button>
-				<button type="button" class="btn-secondary" onclick="toggleProfile()">Cancel</button>
-			    </div>
-			</form>
-		    </div>
-		</div>
-
+            <!-- PROFILE SECTION -->
+            <div id="profileSection" class="hidden section">
+                <div class="card">
+                    <h2 class="card-header">Edit Profile</h2>
+                    <div id="profileMsg" class="message"></div>
+                    <form id="profileForm" onsubmit="event.preventDefault();">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input id="profileFullName" type="text" autocomplete="name" />
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input id="profileEmail" type="email" autocomplete="email" />
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input id="profilePassword" type="password" placeholder="Leave blank to keep current" autocomplete="new-password" />
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-primary" onclick="saveProfile()">Save Changes</button>
+                            <button type="button" class="btn-secondary" onclick="toggleProfile()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <!-- ADD/EDIT PERSON FORM -->
             <div id="personFormSection" class="section hidden">
