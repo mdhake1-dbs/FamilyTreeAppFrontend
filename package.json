@@ -20,6 +20,7 @@
     "cordova": "^13.0.0",
     "cordova-android": "^14.0.1",
     "cordova-plugin-camera": "^8.0.0",
+    "cordova-plugin-file": "^8.0.0",
     "cordova-plugin-geolocation": "^5.0.0"
   },
   "cordova": {
@@ -29,6 +30,9 @@
       "cordova-plugin-camera": {},
       "cordova-plugin-geolocation": {
         "GPS_REQUIRED": "true"
+      },
+      "cordova-plugin-file": {
+        "ANDROIDX_WEBKIT_VERSION": "1.4.0"
       }
     },
     "platforms": [

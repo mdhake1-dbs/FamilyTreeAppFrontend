@@ -1,4 +1,4 @@
-// Family Tree Mobile Application - Production Ready
+// Family Tree Mobile Application
 let authToken = localStorage.getItem('familytree_token');
 let currentUser = null;
 let editingId = null;
@@ -9,12 +9,14 @@ let editingEventId = null;
 document.addEventListener('deviceready', onDeviceReady, false);
 
 function onDeviceReady() {
+    
     if (navigator.splashscreen) navigator.splashscreen.hide();
     initializeApp();
 }
 
 // Browser fallback
 if (!window.cordova) {
+
     document.addEventListener('DOMContentLoaded', initializeApp);
 }
 
@@ -38,33 +40,7 @@ function setupEventListeners() {
     document.getElementById('relPerson2').addEventListener('change', handleRelPersonSelectChange);
 }
 
-// ===== CONFIRMATION MODAL =====
-function showConfirmModal(message, onConfirm) {
-    const modal = document.getElementById('confirmModal');
-    const messageEl = document.getElementById('confirmMessage');
-    const yesBtn = document.getElementById('confirmYes');
-    const noBtn = document.getElementById('confirmNo');
-    
-    messageEl.textContent = message;
-    modal.style.display = 'flex';
-    
-    // Remove old listeners and add new ones
-    const newYesBtn = yesBtn.cloneNode(true);
-    const newNoBtn = noBtn.cloneNode(true);
-    yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
-    noBtn.parentNode.replaceChild(newNoBtn, noBtn);
-    
-    document.getElementById('confirmYes').onclick = () => {
-        modal.style.display = 'none';
-        onConfirm();
-    };
-    
-    document.getElementById('confirmNo').onclick = () => {
-        modal.style.display = 'none';
-    };
-}
 
-// ===== AUTH =====
 function switchAuthTab(tab) {
     document.getElementById('authMessage').style.display = 'none';
     const forms = {login: document.getElementById('loginForm'), register: document.getElementById('registerForm')};
@@ -91,6 +67,7 @@ async function checkAuth() {
         localStorage.removeItem('familytree_token');
         return false;
     } catch (err) {
+        
         return false;
     }
 }
@@ -142,6 +119,7 @@ async function onLoginSubmit(e) {
         authToken = res.token;
         localStorage.setItem('familytree_token', authToken);
 
+        // Fetch full user profile (includes profile_photo)
         const meResp = await fetch(`${CONFIG.API_URL}/auth/me`, {
             headers: { Authorization: `Bearer ${authToken}` }
         });
@@ -149,8 +127,10 @@ async function onLoginSubmit(e) {
 
         if (meData.success) {
             currentUser = meData.user;
+
             if (currentUser.profile_photo) {
-                document.getElementById('profileAvatar').src = imageUrl(currentUser.profile_photo);
+                document.getElementById('profileAvatar').src =
+                    imageUrl(currentUser.profile_photo);
             }
         }
 
@@ -162,14 +142,21 @@ async function onLoginSubmit(e) {
     }
 }
 
+
 async function onRegisterSubmit(e) {
     e.preventDefault();
+    const email = document.getElementById('regEmail').value.trim();
     const data = {
         username: document.getElementById('regUsername').value,
         password: document.getElementById('regPassword').value,
-        email: document.getElementById('regEmail').value,
+        email: email,
         full_name: document.getElementById('regFullName').value
     };
+    
+    if (!email) {
+	  showAuthMessage('Email is required', 'error');
+	  return;
+    }
     
     try {
         const r = await fetch(`${CONFIG.API_URL}/auth/register`, {
@@ -224,16 +211,12 @@ function showMessage(msg, type) {
     setTimeout(() => box.style.display = 'none', 4000);
 }
 
-// ===== PROFILE =====
 function toggleProfile() {
     const el = document.getElementById('profileSection');
     if (el.classList.contains('hidden')) {
         document.getElementById('profileFullName').value = currentUser.full_name || '';
         document.getElementById('profileEmail').value = currentUser.email || '';
         document.getElementById('profilePassword').value = '';
-        if (currentUser.profile_photo) {
-            document.getElementById('profileAvatar').src = imageUrl(currentUser.profile_photo);
-        }
         hideAllMainSections();
         el.classList.remove('hidden');
     } else {
@@ -242,6 +225,7 @@ function toggleProfile() {
     }
 }
 
+// Fixed toggle function with overlay
 function toggleMobileMenu() {
     const nav = document.getElementById('mobileNav');
     const overlay = document.getElementById('sidebarOverlay');
@@ -249,6 +233,7 @@ function toggleMobileMenu() {
     nav.classList.toggle('hidden');
     overlay.classList.toggle('active');
     
+    // Prevent body scroll when menu is open
     if (!nav.classList.contains('hidden')) {
         document.body.style.overflow = 'hidden';
     } else {
@@ -257,31 +242,22 @@ function toggleMobileMenu() {
 }
 
 function changeProfilePhoto() {
-    takePhoto(imageURI => {
-        window.resolveLocalFileSystemURL(imageURI, entry => {
-            entry.file(file => {
-                const reader = new FileReader();
-
-                reader.onloadend = function () {
-                    const base64 = reader.result;
-                    document.getElementById('profileAvatar').src = base64;
-                    uploadImage(base64, '/users/profile-photo', res => {
-                        console.log('Profile photo updated', res);
-                    });
-                };
-
-                reader.readAsDataURL(file);
-            });
-        });
+  takePhoto(uri => {
+    uploadImageFromURI(uri, '/users/profile-photo', res => {
+      setTimeout(() => {
+        document.getElementById('profileAvatar').src = imageUrl(res.profile_photo);
+      }, 300);
     });
+  });
 }
 
-async function updateProfile() {
+async function saveProfile() {
     const data = {
         full_name: document.getElementById('profileFullName').value,
         email: document.getElementById('profileEmail').value,
-        password: document.getElementById('profilePassword').value || undefined
+        password: document.getElementById('profilePassword').value
     };
+    const pm = document.getElementById('profileMsg');
     
     try {
         const r = await fetch(`${CONFIG.API_URL}/auth/me`, {
@@ -298,58 +274,73 @@ async function updateProfile() {
             currentUser = res.user;
             const userName = currentUser.full_name || currentUser.username;
             document.getElementById('mobileUserName').textContent = userName;
-            showMessage('Profile updated successfully', 'success');
-            setTimeout(() => toggleProfile(), 1500);
+            pm.textContent = 'Profile updated';
+            pm.className = 'message success';
+            pm.style.display = 'block';
+            setTimeout(() => {
+                pm.style.display = 'none';
+                toggleProfile();
+            }, 2000);
         } else {
-            showMessage(res.error || 'Error updating profile', 'error');
+            pm.textContent = res.error || 'Error';
+            pm.className = 'message error';
+            pm.style.display = 'block';
         }
     } catch (err) {
-        showMessage('Connection error: ' + err.message, 'error');
+        pm.textContent = 'Connection error: ' + err.message;
+        pm.className = 'message error';
+        pm.style.display = 'block';
     }
 }
 
 function imageUrl(path) {
-    if (!path) return 'img/avatar-placeholder.png';
-    return CONFIG.API_URL.replace('/api', '') + '/' + path + '?t=' + Date.now();
+  if (!path) return 'img/avatar-placeholder.png';
+  return CONFIG.API_URL.replace('/api', '') + '/' + path + '?t=' + Date.now();
 }
 
 function takePhoto(callback) {
-    if (!navigator.camera) {
-        alert('Camera not available');
-        return;
+  navigator.camera.getPicture(
+    uri => callback(uri),
+    err => alert('Camera error'),
+    {
+      quality: 70,
+      destinationType: Camera.DestinationType.FILE_URI,
+      encodingType: Camera.EncodingType.JPEG,
+      correctOrientation: true
     }
-    navigator.camera.getPicture(
-        uri => callback(uri),
-        err => alert('Camera error'),
-        {
-            quality: 70,
-            destinationType: Camera.DestinationType.FILE_URI,
-            encodingType: Camera.EncodingType.JPEG,
-            correctOrientation: true
-        }
-    );
+  );
 }
 
-function uploadImage(base64, endpoint, callback) {
-    if (!base64 || !base64.startsWith('data:image/')) {
-        console.error('uploadImage called with invalid data:', base64);
-        return;
-    }
+function uploadImageFromURI(uri, endpoint, callback) {
+  window.resolveLocalFileSystemURL(uri, entry => {
+    entry.file(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const blob = dataURItoBlob(reader.result);
+        const formData = new FormData();
+        formData.append('photo', blob, 'photo.jpg');
 
-    const blob = dataURItoBlob(base64);
-    const formData = new FormData();
-    formData.append('photo', blob, 'photo.jpg');
+        fetch(CONFIG.API_URL + endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+          body: formData
+        })
+          .then(r => r.json())
+          .then(res => callback && callback(res))
+          .catch(() => alert('Upload failed'));
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+}
 
-    fetch(CONFIG.API_URL + endpoint, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${authToken}`
-        },
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => callback && callback(data))
-    .catch(err => console.error('Upload failed', err));
+function dataURItoBlob(dataURI) {
+  const parts = dataURI.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const binary = atob(parts[1]);
+  const array = [];
+  for (let i = 0; i < binary.length; i++) array.push(binary.charCodeAt(i));
+  return new Blob([new Uint8Array(array)], { type: mime });
 }
 
 function escapeHtml(str) {
@@ -357,21 +348,18 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+function escapeJs(str) {
+    if (!str) return '';
+    return String(str).replace(/'/g, "\\'");
+}
+
 // ===== PEOPLE MANAGEMENT =====
 function showAddPerson() {
     hideAllMainSections();
     document.getElementById('personFormSection').classList.remove('hidden');
-    document.getElementById('personFormTitle').textContent = 'Add New Person';
+    document.getElementById('formTitle').textContent = 'Add New Person';
     document.getElementById('submitBtn').textContent = 'Add Person';
-    document.getElementById('deletePersonBtn').classList.add('hidden');
-    
-    editingId = null;
-    document.getElementById('personForm').reset();
-    document.getElementById('personId').value = '';
-    document.getElementById('personAvatar').src = 'img/avatar-placeholder.png';
-    document.getElementById('deathDateGroup').classList.add('hidden');
-    
-    window.newPersonPhotoUri = null;
+    resetForm();
 }
 
 function showPeople() {
@@ -391,22 +379,6 @@ function toggleDeathDate() {
     }
 }
 
-function changePersonPhoto() {
-    takePhoto(imageURI => {
-        window.resolveLocalFileSystemURL(imageURI, entry => {
-            entry.file(file => {
-                const reader = new FileReader();
-                reader.onloadend = function () {
-                    const base64 = reader.result;
-                    window.newPersonPhotoUri = base64;
-                    document.getElementById('personAvatar').src = base64;
-                };
-                reader.readAsDataURL(file);
-            });
-        });
-    });
-}
-
 async function onPersonFormSubmit(e) {
     e.preventDefault();
     const status = document.getElementById('lifeStatus').value;
@@ -422,8 +394,11 @@ async function onPersonFormSubmit(e) {
         relation: ''
     };
     
-    if (editingId) {
-        await updatePerson(editingId, personData);
+    const hiddenId = document.getElementById('personId').value;
+    const idToUse = editingId || (hiddenId ? parseInt(hiddenId, 10) : null);
+    
+    if (idToUse) {
+        await updatePerson(idToUse, personData);
     } else {
         await createPerson(personData);
     }
@@ -442,19 +417,9 @@ async function createPerson(personData) {
         const res = await r.json();
         
         if (res.success) {
-            const newPersonId = res.data.id;
-            
-            if (window.newPersonPhotoUri) {
-                uploadImage(window.newPersonPhotoUri, `/people/${newPersonId}/photo`, (photoRes) => {
-                    showMessage('Person added with photo', 'success');
-                    resetPersonForm();
-                    showPeople();
-                });
-            } else {
-                showMessage('Person added successfully', 'success');
-                resetPersonForm();
-                showPeople();
-            }
+            showMessage('Person added successfully', 'success');
+            resetForm();
+            showPeople();
         } else {
             showMessage('Error: ' + res.error, 'error');
         }
@@ -485,57 +450,37 @@ async function loadPeople() {
 }
 
 function displayPeople(people) {
-    const container = document.getElementById('peopleList');
-    container.innerHTML = '';
+  const container = document.getElementById('peopleList');
+  container.innerHTML = '';
 
-    if (!people || people.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">👤</div>
-                <h3>No Family Members</h3>
-                <p>Start by adding your first family member</p>
-                <button onclick="showAddPerson()" class="btn-primary">
-                    Add First Person
-                </button>
-            </div>
-        `;
-        return;
-    }
+  people.forEach(p => {
+    const imgSrc = imageUrl(p.photo);
 
-    people.forEach(p => {
-        const birthDate = p.birth_date ? new Date(p.birth_date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        }) : 'Birth date not set';
-        
-        const card = document.createElement('div');
-        card.className = 'person-card';
-        card.innerHTML = `
-            <div class="person-avatar">
-                <img src="${imageUrl(p.photo)}" 
-                     alt="${escapeHtml(p.given_name)}"
-                     onerror="this.src='img/avatar-placeholder.png'"
-                     class="person-avatar-img">
-            </div>
-            <div class="person-info">
-                <h3 class="person-name">
-                    ${escapeHtml(p.given_name)} ${escapeHtml(p.family_name)}
-                </h3>
-                <p class="person-birth">${birthDate}</p>
-                <div class="person-meta">
-                    <span class="person-gender">${p.gender || 'Not specified'}</span>
-                    ${p.death_date ? '<span class="person-status deceased">Deceased</span>' : '<span class="person-status alive">Alive</span>'}
-                </div>
-            </div>
-            <div class="person-actions">
-                <button class="btn-icon" onclick="event.stopPropagation(); editPerson(${p.id})" title="Edit">✏️</button>
-            </div>
-        `;
-        
-        card.onclick = () => editPerson(p.id);
-        container.appendChild(card);
+    container.innerHTML += `
+      <div class="list-item person-item">
+        <div class="person-photo-wrapper">
+          <img src="${imgSrc}"
+               class="person-photo"
+               loading="lazy"
+               onerror="this.src='img/avatar-placeholder.png'" />
+          <button class="camera-btn small"
+                  onclick="changePersonPhoto(${p.id})">📷</button>
+        </div>
+        <div class="list-item-content">
+          <div class="list-item-title">
+            ${p.given_name} ${p.family_name}
+          </div>
+        </div>
+      </div>`;
+  });
+}
+
+function changePersonPhoto(id) {
+  takePhoto(uri => {
+    uploadImageFromURI(uri, `/people/${id}/photo`, () => {
+      setTimeout(loadPeople, 300);
     });
+  });
 }
 
 async function editPerson(id) {
@@ -551,27 +496,24 @@ async function editPerson(id) {
             
             hideAllMainSections();
             document.getElementById('personFormSection').classList.remove('hidden');
-            document.getElementById('personFormTitle').textContent = 'Edit Person';
+            document.getElementById('formTitle').textContent = 'Edit Person';
             document.getElementById('submitBtn').textContent = 'Update Person';
-            document.getElementById('deletePersonBtn').classList.remove('hidden');
-            
-            document.getElementById('personId').value = p.id;
+            document.getElementById('personId').value = id;
             document.getElementById('givenName').value = p.given_name || '';
             document.getElementById('familyName').value = p.family_name || '';
             document.getElementById('gender').value = p.gender || '';
-            document.getElementById('lifeStatus').value = p.death_date ? 'deceased' : 'alive';
             document.getElementById('birthDate').value = p.birth_date ? p.birth_date.substring(0, 10) : '';
-            document.getElementById('deathDate').value = p.death_date ? p.death_date.substring(0, 10) : '';
             document.getElementById('birthPlace').value = p.birth_place || '';
             document.getElementById('bio').value = p.bio || '';
-            document.getElementById('personAvatar').src = imageUrl(p.photo);
             
             if (p.death_date) {
-                document.getElementById('deathDateGroup').classList.remove('hidden');
+                document.getElementById('lifeStatus').value = 'deceased';
+                document.getElementById('deathDate').value = p.death_date.substring(0, 10);
             } else {
-                document.getElementById('deathDateGroup').classList.add('hidden');
+                document.getElementById('lifeStatus').value = 'alive';
+                document.getElementById('deathDate').value = '';
             }
-            
+            toggleDeathDate();
             window.scrollTo({top: 0, behavior: 'smooth'});
         } else {
             showMessage('Error: ' + res.error, 'error');
@@ -594,17 +536,9 @@ async function updatePerson(id, personData) {
         const res = await r.json();
         
         if (res.success) {
-            if (window.newPersonPhotoUri) {
-                uploadImage(window.newPersonPhotoUri, `/people/${id}/photo`, () => {
-                    showMessage('Person updated with photo', 'success');
-                    resetPersonForm();
-                    showPeople();
-                });
-            } else {
-                showMessage('Person updated successfully', 'success');
-                resetPersonForm();
-                showPeople();
-            }
+            showMessage('Person updated successfully', 'success');
+            resetForm();
+            showPeople();
         } else {
             showMessage('Error: ' + res.error, 'error');
         }
@@ -613,38 +547,50 @@ async function updatePerson(id, personData) {
     }
 }
 
-async function deletePerson(id) {
-    showConfirmModal('Delete this person? This will also delete all their relationships and events.', async () => {
+async function deletePerson(id, name) {
+    // if (!confirm(`Delete ${name}?`)) return;
+    
+      const modal = document.getElementById("customConfirmPerson");
+      modal.style.display = "flex";
+
+      document.getElementById("yesBtnPerson").onclick = async () => {
+        modal.style.display = "none";
         try {
-            const r = await fetch(`${CONFIG.API_URL}/people/${id}`, {
-                method: 'DELETE',
-                headers: {'Authorization': `Bearer ${authToken}`}
-            });
-            const res = await r.json();
-            
-            if (res.success) {
-                showMessage('Person deleted successfully', 'success');
-                resetPersonForm();
-                showPeople();
-            } else {
-                showMessage('Error: ' + res.error, 'error');
-            }
+          const r = await fetch(`${CONFIG.API_URL}/people/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const res = await r.json();
+
+          if (res.success) {
+            showMessage("Person deleted successfully", "success");
+            loadPeople();
+          } else {
+            showMessage("Error: " + res.error, "error");
+          }
         } catch (err) {
-            showMessage('Connection error: ' + err.message, 'error');
+          showMessage("Connection error: " + err.message, "error");
         }
-    });
+      };
+      document.getElementById("noBtnPerson").onclick = () => {
+        modal.style.display = "none";
+        return;
+      };
+    
 }
 
-function resetPersonForm() {
+function resetForm() {
     editingId = null;
-    window.newPersonPhotoUri = null;
     document.getElementById('personForm').reset();
+    document.getElementById('formTitle').textContent = 'Add New Person';
+    document.getElementById('submitBtn').textContent = 'Add Person';
     document.getElementById('personId').value = '';
-    document.getElementById('personAvatar').src = 'img/avatar-placeholder.png';
+    document.getElementById('lifeStatus').value = 'alive';
+    toggleDeathDate();
 }
 
 function cancelAddEdit() {
-    resetPersonForm();
+    resetForm();
     showHome();
 }
 
@@ -652,13 +598,8 @@ function cancelAddEdit() {
 function showAddRelationship() {
     hideAllMainSections();
     document.getElementById('relationshipsSection').classList.remove('hidden');
-    document.getElementById('relationshipFormTitle').textContent = 'Add Relationship';
-    document.getElementById('relSubmitBtn').textContent = 'Add Relationship';
-    
-    // Show form, hide list
-    document.getElementById('relationshipForm').style.display = 'block';
-    document.getElementById('relationshipsList').style.display = 'none';
-    
+    document.getElementById('relationshipForm').classList.remove('hidden');
+    document.getElementById('relationshipsList').classList.add('hidden');
     fillRelationTypes();
     loadPeopleOptionsForRelationships();
     resetRelationshipForm();
@@ -667,11 +608,8 @@ function showAddRelationship() {
 function showViewRelationships() {
     hideAllMainSections();
     document.getElementById('relationshipsSection').classList.remove('hidden');
-    
-    // Hide form, show list
-    document.getElementById('relationshipForm').style.display = 'none';
-    document.getElementById('relationshipsList').style.display = 'block';
-    
+    document.getElementById('relationshipForm').classList.add('hidden');
+    document.getElementById('relationshipsList').classList.remove('hidden');
     loadRelationships();
 }
 
@@ -684,22 +622,6 @@ function fillRelationTypes() {
         opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
         sel.appendChild(opt);
     });
-}
-
-function handleRelPersonSelectChange(event) {
-    const person1Select = document.getElementById('relPerson1');
-    const person2Select = document.getElementById('relPerson2');
-    const person1Id = person1Select.value;
-    const person2Id = person2Select.value;
-    
-    if (person1Id && person2Id && person1Id === person2Id) {
-        showRelMessage('A person cannot have a relationship with themselves', 'error');
-        if (event.target.id === 'relPerson1') {
-            person2Select.value = '';
-        } else {
-            person1Select.value = '';
-        }
-    }
 }
 
 async function loadPeopleOptionsForRelationships() {
@@ -715,36 +637,26 @@ async function loadPeopleOptionsForRelationships() {
         }
         
         const people = res.data || [];
-        const person1Select = document.getElementById('relPerson1');
-        const person2Select = document.getElementById('relPerson2');
-        
-        person1Select.innerHTML = '<option value="">Select person...</option>';
-        people.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = `${p.given_name} ${p.family_name}`;
-            person1Select.appendChild(opt);
-        });
-        
-        person2Select.innerHTML = '<option value="">Select person...</option>';
-        people.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = `${p.given_name} ${p.family_name}`;
-            person2Select.appendChild(opt);
-        });
+        fillPersonSelect('relPerson1', people);
+        fillPersonSelect('relPerson2', people);
     } catch (err) {
         showRelMessage('Connection error: ' + err.message, 'error');
     }
 }
 
-function showRelMessage(msg, type) {
-    const box = document.getElementById('relMessage');
-    box.textContent = msg;
-    box.className = 'message ' + (type === 'error' ? 'error' : 'success');
-    box.style.display = 'block';
-    window.scrollTo({top: 0, behavior: 'smooth'});
-    setTimeout(() => box.style.display = 'none', 4000);
+function fillPersonSelect(selectId, people) {
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = '<option value="">Select person...</option>';
+    people.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.given_name} ${p.family_name}`;
+        sel.appendChild(opt);
+    });
+}
+
+function handleRelPersonSelectChange(event) {
+    // Future: could add "Add new person" option here
 }
 
 async function onRelationshipFormSubmit(e) {
@@ -782,7 +694,7 @@ async function createRelationship(payload) {
         if (res.success) {
             showRelMessage('Relationship added successfully', 'success');
             resetRelationshipForm();
-            setTimeout(() => showViewRelationships(), 1000);
+            loadRelationships();
         } else {
             showRelMessage(res.error || 'Error creating relationship', 'error');
         }
@@ -806,7 +718,7 @@ async function updateRelationship(id, payload) {
         if (res.success) {
             showRelMessage('Relationship updated successfully', 'success');
             resetRelationshipForm();
-            setTimeout(() => showViewRelationships(), 1000);
+            loadRelationships();
         } else {
             showRelMessage(res.error || 'Error updating relationship', 'error');
         }
@@ -840,92 +752,61 @@ function displayRelationships(rels) {
     const container = document.getElementById('relationshipsList');
     
     if (!rels.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">🔗</div>
-                <h3>No Relationships</h3>
-                <p>Add relationships between family members</p>
-                <button onclick="showAddRelationship()" class="btn-primary">Add Relationship</button>
-            </div>
-        `;
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No relationships found.</div>';
         return;
     }
     
-    container.innerHTML = '';
+    let html = '';
     rels.forEach(r => {
         const relType = (r.type || '').charAt(0).toUpperCase() + (r.type || '').slice(1);
         
-        const item = document.createElement('div');
-        item.className = 'person-card';
-        item.innerHTML = `
-            <div class="person-info" style="flex: 1;">
-                <h3 class="person-name">${escapeHtml(r.person1_name || '')}</h3>
-                <p class="person-birth"><strong>${relType}</strong> of ${escapeHtml(r.person2_name || '')}</p>
-            </div>
-            <div class="person-actions">
-                <button class="btn-icon" onclick="editRelationship(${r.id})" title="Edit">✏️</button>
-                <button class="btn-icon" onclick="deleteRelationship(${r.id})" title="Delete" style="color: var(--danger);">🗑️</button>
+        html += `
+            <div class="list-item">
+                <div class="list-item-header">
+                    <div class="list-item-title">${escapeHtml(r.person1_name || '')}</div>
+                </div>
+                <div class="list-item-details">
+                    <div><strong>${relType}</strong> of ${escapeHtml(r.person2_name || '')}</div>
+                </div>
+                <div class="list-item-actions">
+                    <button class="btn-delete btn-sm" onclick="deleteRelationship(${r.id})">Delete</button>
+                </div>
             </div>
         `;
-        container.appendChild(item);
     });
-}
-
-async function editRelationship(id) {
-    try {
-        const r = await fetch(`${CONFIG.API_URL}/relationships/${id}`, {
-            headers: {'Authorization': `Bearer ${authToken}`}
-        });
-        const res = await r.json();
-        
-        if (res.success) {
-            const rel = res.data;
-            editingRelationshipId = id;
-            
-            hideAllMainSections();
-            document.getElementById('relationshipsSection').classList.remove('hidden');
-            document.getElementById('relationshipFormTitle').textContent = 'Edit Relationship';
-            document.getElementById('relSubmitBtn').textContent = 'Update Relationship';
-            
-            document.getElementById('relationshipForm').style.display = 'block';
-            document.getElementById('relationshipsList').style.display = 'none';
-            
-            await loadPeopleOptionsForRelationships();
-            await fillRelationTypes();
-            
-            document.getElementById('relationshipId').value = rel.id;
-            document.getElementById('relPerson1').value = rel.person1_id;
-            document.getElementById('relPerson2').value = rel.person2_id;
-            document.getElementById('relType').value = rel.type;
-            
-            window.scrollTo({top: 0, behavior: 'smooth'});
-        } else {
-            showRelMessage('Error: ' + res.error, 'error');
-        }
-    } catch (err) {
-        showRelMessage('Connection error: ' + err.message, 'error');
-    }
+    
+    container.innerHTML = html;
 }
 
 async function deleteRelationship(id) {
-    showConfirmModal('Delete this relationship?', async () => {
-        try {
-            const r = await fetch(`${CONFIG.API_URL}/relationships/${id}`, {
-                method: 'DELETE',
-                headers: {'Authorization': `Bearer ${authToken}`}
-            });
-            const res = await r.json();
+    // if (!confirm('Delete this relationship?')) return;
+      const modal = document.getElementById("customConfirmRelationship");
+      modal.style.display = "flex";
 
-            if (res.success) {
-                showRelMessage('Relationship deleted successfully', 'success');
-                loadRelationships();
-            } else {
-                showRelMessage(res.error || 'Error deleting relationship', 'error');
-            }
+      document.getElementById("yesBtnRelationship").onclick = async () => {
+        modal.style.display = "none";
+        try {
+          const r = await fetch(`${CONFIG.API_URL}/relationships/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const res = await r.json();
+
+          if (res.success) {
+            showRelMessage("Relationship deleted successfully", "success");
+            loadRelationships();
+          } else {
+            showRelMessage(res.error || "Error deleting relationship", "error");
+          }
         } catch (err) {
-            showRelMessage('Connection error: ' + err.message, 'error');
+          showRelMessage("Connection error: " + err.message, "error");
         }
-    });
+      };
+      document.getElementById("noBtnRelationship").onclick = () => {
+        modal.style.display = "none";
+        return;
+      };
+    
 }
 
 function resetRelationshipForm() {
@@ -935,16 +816,21 @@ function resetRelationshipForm() {
     document.getElementById('relSubmitBtn').textContent = 'Add Relationship';
 }
 
+function showRelMessage(msg, type) {
+    const box = document.getElementById('relMessage');
+    box.textContent = msg;
+    box.className = 'message ' + (type === 'error' ? 'error' : 'success');
+    box.style.display = 'block';
+    window.scrollTo({top: 0, behavior: 'smooth'});
+    setTimeout(() => box.style.display = 'none', 4000);
+}
+
 // ===== EVENTS =====
 function showAddEvent() {
     hideAllMainSections();
     document.getElementById('eventsSection').classList.remove('hidden');
-    document.getElementById('eventFormTitle').textContent = 'Add Event';
-    document.getElementById('eventSubmitBtn').textContent = 'Add Event';
-    
-    document.getElementById('eventForm').style.display = 'block';
-    document.getElementById('eventsList').style.display = 'none';
-    
+    document.getElementById('eventForm').classList.remove('hidden');
+    document.getElementById('eventsList').classList.add('hidden');
     loadPeopleOptionsForEvents();
     resetEventForm();
 }
@@ -952,10 +838,8 @@ function showAddEvent() {
 function showViewEvents() {
     hideAllMainSections();
     document.getElementById('eventsSection').classList.remove('hidden');
-    
-    document.getElementById('eventForm').style.display = 'none';
-    document.getElementById('eventsList').style.display = 'block';
-    
+    document.getElementById('eventForm').classList.add('hidden');
+    document.getElementById('eventsList').classList.remove('hidden');
     loadEvents();
 }
 
@@ -1022,7 +906,7 @@ async function createEvent(payload) {
         if (res.success) {
             showEventMessage('Event added successfully', 'success');
             resetEventForm();
-            setTimeout(() => showViewEvents(), 1000);
+            loadEvents();
         } else {
             showEventMessage(res.error || 'Error creating event', 'error');
         }
@@ -1046,7 +930,7 @@ async function updateEvent(id, payload) {
         if (res.success) {
             showEventMessage('Event updated successfully', 'success');
             resetEventForm();
-            setTimeout(() => showViewEvents(), 1000);
+            loadEvents();
         } else {
             showEventMessage(res.error || 'Error updating event', 'error');
         }
@@ -1080,99 +964,64 @@ function displayEvents(events) {
     const container = document.getElementById('eventsList');
     
     if (!events.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">📅</div>
-                <h3>No Events</h3>
-                <p>Add family events and milestones</p>
-                <button onclick="showAddEvent()" class="btn-primary">Add Event</button>
-            </div>
-        `;
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No events found.</div>';
         return;
     }
     
-    container.innerHTML = '';
+    let html = '';
     events.forEach(ev => {
-        const dateText = ev.event_date ? new Date(ev.event_date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        }) : 'Date not set';
+        const dateText = ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '-';
         
-        const item = document.createElement('div');
-        item.className = 'person-card';
-        item.innerHTML = `
-            <div class="person-info" style="flex: 1;">
-                <h3 class="person-name">${escapeHtml(ev.title || '')}</h3>
-                <p class="person-birth">${escapeHtml(ev.person_name || '')} • ${dateText}</p>
-                ${ev.place ? `<p class="person-birth" style="margin-top: 0.25rem;">📍 ${escapeHtml(ev.place)}</p>` : ''}
-                ${ev.description ? `<p class="person-birth" style="margin-top: 0.25rem; font-size: 0.85rem;">${escapeHtml(ev.description)}</p>` : ''}
-            </div>
-            <div class="person-actions">
-                <button class="btn-icon" onclick="editEvent(${ev.id})" title="Edit">✏️</button>
-                <button class="btn-icon" onclick="deleteEvent(${ev.id})" title="Delete" style="color: var(--danger);">🗑️</button>
+        html += `
+            <div class="list-item">
+                <div class="list-item-header">
+                    <div class="list-item-title">${escapeHtml(ev.title || '')}</div>
+                </div>
+                <div class="list-item-details">
+                    <div><strong>Person:</strong> ${escapeHtml(ev.person_name || '')}</div>
+                    <div><strong>Date:</strong> ${dateText}</div>
+                    ${ev.place ? `<div><strong>Place:</strong> ${escapeHtml(ev.place)}</div>` : ''}
+                    ${ev.description ? `<div>${escapeHtml(ev.description)}</div>` : ''}
+                </div>
+                <div class="list-item-actions">
+                    <button class="btn-delete btn-sm" onclick="deleteEvent(${ev.id})">Delete</button>
+                </div>
             </div>
         `;
-        container.appendChild(item);
     });
+    
+    container.innerHTML = html;
 }
 
-async function editEvent(id) {
-    try {
+async function deleteEvent(id) {
+    // if (!confirm('Delete this event?')) return;
+    const modal = document.getElementById("customConfirm");
+    modal.style.display = "flex";
+
+    document.getElementById("yesBtn").onclick = async() => {
+      modal.style.display = "none";
+       try {
         const r = await fetch(`${CONFIG.API_URL}/events/${id}`, {
+            method: 'DELETE',
             headers: {'Authorization': `Bearer ${authToken}`}
         });
         const res = await r.json();
         
         if (res.success) {
-            const ev = res.data;
-            editingEventId = id;
-            
-            hideAllMainSections();
-            document.getElementById('eventsSection').classList.remove('hidden');
-            document.getElementById('eventFormTitle').textContent = 'Edit Event';
-            document.getElementById('eventSubmitBtn').textContent = 'Update Event';
-            
-            document.getElementById('eventForm').style.display = 'block';
-            document.getElementById('eventsList').style.display = 'none';
-            
-            await loadPeopleOptionsForEvents();
-            
-            document.getElementById('eventId').value = ev.id;
-            document.getElementById('eventPerson').value = ev.created_by;
-            document.getElementById('eventTitle').value = ev.title || '';
-            document.getElementById('eventDate').value = ev.event_date ? ev.event_date.substring(0, 10) : '';
-            document.getElementById('eventPlace').value = ev.place || '';
-            document.getElementById('eventDescription').value = ev.description || '';
-            
-            window.scrollTo({top: 0, behavior: 'smooth'});
+            showEventMessage('Event deleted successfully', 'success');
+            loadEvents();
         } else {
-            showEventMessage('Error: ' + res.error, 'error');
+            showEventMessage(res.error || 'Error deleting event', 'error');
         }
     } catch (err) {
         showEventMessage('Connection error: ' + err.message, 'error');
     }
-}
-
-async function deleteEvent(id) {
-    showConfirmModal('Delete this event?', async () => {
-        try {
-            const r = await fetch(`${CONFIG.API_URL}/events/${id}`, {
-                method: 'DELETE',
-                headers: {'Authorization': `Bearer ${authToken}`}
-            });
-            const res = await r.json();
-            
-            if (res.success) {
-                showEventMessage('Event deleted successfully', 'success');
-                loadEvents();
-            } else {
-                showEventMessage(res.error || 'Error deleting event', 'error');
-            }
-        } catch (err) {
-            showEventMessage('Connection error: ' + err.message, 'error');
-        }
-    });
+    };
+    document.getElementById("noBtn").onclick = () => {
+      modal.style.display = "none";
+      return;
+    };
+   
 }
 
 function resetEventForm() {
@@ -1189,28 +1038,4 @@ function showEventMessage(msg, type) {
     box.style.display = 'block';
     window.scrollTo({top: 0, behavior: 'smooth'});
     setTimeout(() => box.style.display = 'none', 4000);
-}
-
-// ===== UTILITY =====
-function dataURItoBlob(data) {
-    if (data instanceof Blob) {
-        return data;
-    }
-
-    if (!data.startsWith('data:')) {
-        throw new Error('Expected Base64 data URL, got: ' + data.substring(0, 30));
-    }
-
-    const parts = data.split(',');
-    const mime = parts[0].match(/:(.*?);/)[1];
-    const byteString = atob(parts[1]);
-
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-
-    for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-    }
-
-    return new Blob([ab], { type: mime });
 }

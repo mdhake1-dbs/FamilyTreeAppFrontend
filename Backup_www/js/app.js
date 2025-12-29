@@ -1,19 +1,4 @@
-// Fixed toggle function with overlay
-function toggleMobileMenu() {
-    const nav = document.getElementById('mobileNav');
-    const overlay = document.getElementById('sidebarOverlay');
-    
-    nav.classList.toggle('hidden');
-    overlay.classList.toggle('active');
-    
-    // Prevent body scroll when menu is open
-    if (!nav.classList.contains('hidden')) {
-        document.body.style.overflow = 'hidden';
-    } else {
-        document.body.style.overflow = '';
-    }
-}
-// Family Tree Mobile Application
+// Family Tree Mobile Application - Production Ready
 let authToken = localStorage.getItem('familytree_token');
 let currentUser = null;
 let editingId = null;
@@ -24,14 +9,12 @@ let editingEventId = null;
 document.addEventListener('deviceready', onDeviceReady, false);
 
 function onDeviceReady() {
-    debugLog('Cordova device ready');
     if (navigator.splashscreen) navigator.splashscreen.hide();
     initializeApp();
 }
 
 // Browser fallback
 if (!window.cordova) {
-    debugLog('Running in browser mode');
     document.addEventListener('DOMContentLoaded', initializeApp);
 }
 
@@ -55,7 +38,33 @@ function setupEventListeners() {
     document.getElementById('relPerson2').addEventListener('change', handleRelPersonSelectChange);
 }
 
+// ===== CONFIRMATION MODAL =====
+function showConfirmModal(message, onConfirm) {
+    const modal = document.getElementById('confirmModal');
+    const messageEl = document.getElementById('confirmMessage');
+    const yesBtn = document.getElementById('confirmYes');
+    const noBtn = document.getElementById('confirmNo');
+    
+    messageEl.textContent = message;
+    modal.style.display = 'flex';
+    
+    // Remove old listeners and add new ones
+    const newYesBtn = yesBtn.cloneNode(true);
+    const newNoBtn = noBtn.cloneNode(true);
+    yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+    noBtn.parentNode.replaceChild(newNoBtn, noBtn);
+    
+    document.getElementById('confirmYes').onclick = () => {
+        modal.style.display = 'none';
+        onConfirm();
+    };
+    
+    document.getElementById('confirmNo').onclick = () => {
+        modal.style.display = 'none';
+    };
+}
 
+// ===== AUTH =====
 function switchAuthTab(tab) {
     document.getElementById('authMessage').style.display = 'none';
     const forms = {login: document.getElementById('loginForm'), register: document.getElementById('registerForm')};
@@ -82,7 +91,6 @@ async function checkAuth() {
         localStorage.removeItem('familytree_token');
         return false;
     } catch (err) {
-        debugLog('Auth check failed:', err);
         return false;
     }
 }
@@ -114,26 +122,41 @@ function hideAllMainSections() {
 
 async function onLoginSubmit(e) {
     e.preventDefault();
+
     const username = document.getElementById('loginUsername').value;
     const password = document.getElementById('loginPassword').value;
-    
+
     try {
         const r = await fetch(`${CONFIG.API_URL}/auth/login`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username, password})
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
         });
         const res = await r.json();
-        
-        if (res.success) {
-            authToken = res.token;
-            currentUser = res.user;
-            localStorage.setItem('familytree_token', authToken);
-            showApp();
-            showHome();
-        } else {
+
+        if (!res.success) {
             showAuthMessage(res.error, 'error');
+            return;
         }
+
+        authToken = res.token;
+        localStorage.setItem('familytree_token', authToken);
+
+        const meResp = await fetch(`${CONFIG.API_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        const meData = await meResp.json();
+
+        if (meData.success) {
+            currentUser = meData.user;
+            if (currentUser.profile_photo) {
+                document.getElementById('profileAvatar').src = imageUrl(currentUser.profile_photo);
+            }
+        }
+
+        showApp();
+        showHome();
+
     } catch (err) {
         showAuthMessage('Connection error: ' + err.message, 'error');
     }
@@ -201,12 +224,16 @@ function showMessage(msg, type) {
     setTimeout(() => box.style.display = 'none', 4000);
 }
 
+// ===== PROFILE =====
 function toggleProfile() {
     const el = document.getElementById('profileSection');
     if (el.classList.contains('hidden')) {
         document.getElementById('profileFullName').value = currentUser.full_name || '';
         document.getElementById('profileEmail').value = currentUser.email || '';
         document.getElementById('profilePassword').value = '';
+        if (currentUser.profile_photo) {
+            document.getElementById('profileAvatar').src = imageUrl(currentUser.profile_photo);
+        }
         hideAllMainSections();
         el.classList.remove('hidden');
     } else {
@@ -215,13 +242,46 @@ function toggleProfile() {
     }
 }
 
-async function saveProfile() {
+function toggleMobileMenu() {
+    const nav = document.getElementById('mobileNav');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    nav.classList.toggle('hidden');
+    overlay.classList.toggle('active');
+    
+    if (!nav.classList.contains('hidden')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+
+function changeProfilePhoto() {
+    takePhoto(imageURI => {
+        window.resolveLocalFileSystemURL(imageURI, entry => {
+            entry.file(file => {
+                const reader = new FileReader();
+
+                reader.onloadend = function () {
+                    const base64 = reader.result;
+                    document.getElementById('profileAvatar').src = base64;
+                    uploadImage(base64, '/users/profile-photo', res => {
+                        console.log('Profile photo updated', res);
+                    });
+                };
+
+                reader.readAsDataURL(file);
+            });
+        });
+    });
+}
+
+async function updateProfile() {
     const data = {
         full_name: document.getElementById('profileFullName').value,
         email: document.getElementById('profileEmail').value,
-        password: document.getElementById('profilePassword').value
+        password: document.getElementById('profilePassword').value || undefined
     };
-    const pm = document.getElementById('profileMsg');
     
     try {
         const r = await fetch(`${CONFIG.API_URL}/auth/me`, {
@@ -238,23 +298,58 @@ async function saveProfile() {
             currentUser = res.user;
             const userName = currentUser.full_name || currentUser.username;
             document.getElementById('mobileUserName').textContent = userName;
-            pm.textContent = 'Profile updated';
-            pm.className = 'message success';
-            pm.style.display = 'block';
-            setTimeout(() => {
-                pm.style.display = 'none';
-                toggleProfile();
-            }, 2000);
+            showMessage('Profile updated successfully', 'success');
+            setTimeout(() => toggleProfile(), 1500);
         } else {
-            pm.textContent = res.error || 'Error';
-            pm.className = 'message error';
-            pm.style.display = 'block';
+            showMessage(res.error || 'Error updating profile', 'error');
         }
     } catch (err) {
-        pm.textContent = 'Connection error: ' + err.message;
-        pm.className = 'message error';
-        pm.style.display = 'block';
+        showMessage('Connection error: ' + err.message, 'error');
     }
+}
+
+function imageUrl(path) {
+    if (!path) return 'img/avatar-placeholder.png';
+    return CONFIG.API_URL.replace('/api', '') + '/' + path + '?t=' + Date.now();
+}
+
+function takePhoto(callback) {
+    if (!navigator.camera) {
+        alert('Camera not available');
+        return;
+    }
+    navigator.camera.getPicture(
+        uri => callback(uri),
+        err => alert('Camera error'),
+        {
+            quality: 70,
+            destinationType: Camera.DestinationType.FILE_URI,
+            encodingType: Camera.EncodingType.JPEG,
+            correctOrientation: true
+        }
+    );
+}
+
+function uploadImage(base64, endpoint, callback) {
+    if (!base64 || !base64.startsWith('data:image/')) {
+        console.error('uploadImage called with invalid data:', base64);
+        return;
+    }
+
+    const blob = dataURItoBlob(base64);
+    const formData = new FormData();
+    formData.append('photo', blob, 'photo.jpg');
+
+    fetch(CONFIG.API_URL + endpoint, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${authToken}`
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => callback && callback(data))
+    .catch(err => console.error('Upload failed', err));
 }
 
 function escapeHtml(str) {
@@ -262,18 +357,21 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-function escapeJs(str) {
-    if (!str) return '';
-    return String(str).replace(/'/g, "\\'");
-}
-
 // ===== PEOPLE MANAGEMENT =====
 function showAddPerson() {
     hideAllMainSections();
     document.getElementById('personFormSection').classList.remove('hidden');
-    document.getElementById('formTitle').textContent = 'Add New Person';
+    document.getElementById('personFormTitle').textContent = 'Add New Person';
     document.getElementById('submitBtn').textContent = 'Add Person';
-    resetForm();
+    document.getElementById('deletePersonBtn').classList.add('hidden');
+    
+    editingId = null;
+    document.getElementById('personForm').reset();
+    document.getElementById('personId').value = '';
+    document.getElementById('personAvatar').src = 'img/avatar-placeholder.png';
+    document.getElementById('deathDateGroup').classList.add('hidden');
+    
+    window.newPersonPhotoUri = null;
 }
 
 function showPeople() {
@@ -293,6 +391,22 @@ function toggleDeathDate() {
     }
 }
 
+function changePersonPhoto() {
+    takePhoto(imageURI => {
+        window.resolveLocalFileSystemURL(imageURI, entry => {
+            entry.file(file => {
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                    const base64 = reader.result;
+                    window.newPersonPhotoUri = base64;
+                    document.getElementById('personAvatar').src = base64;
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+    });
+}
+
 async function onPersonFormSubmit(e) {
     e.preventDefault();
     const status = document.getElementById('lifeStatus').value;
@@ -308,11 +422,8 @@ async function onPersonFormSubmit(e) {
         relation: ''
     };
     
-    const hiddenId = document.getElementById('personId').value;
-    const idToUse = editingId || (hiddenId ? parseInt(hiddenId, 10) : null);
-    
-    if (idToUse) {
-        await updatePerson(idToUse, personData);
+    if (editingId) {
+        await updatePerson(editingId, personData);
     } else {
         await createPerson(personData);
     }
@@ -331,9 +442,19 @@ async function createPerson(personData) {
         const res = await r.json();
         
         if (res.success) {
-            showMessage('Person added successfully', 'success');
-            resetForm();
-            showPeople();
+            const newPersonId = res.data.id;
+            
+            if (window.newPersonPhotoUri) {
+                uploadImage(window.newPersonPhotoUri, `/people/${newPersonId}/photo`, (photoRes) => {
+                    showMessage('Person added with photo', 'success');
+                    resetPersonForm();
+                    showPeople();
+                });
+            } else {
+                showMessage('Person added successfully', 'success');
+                resetPersonForm();
+                showPeople();
+            }
         } else {
             showMessage('Error: ' + res.error, 'error');
         }
@@ -365,36 +486,56 @@ async function loadPeople() {
 
 function displayPeople(people) {
     const container = document.getElementById('peopleList');
-    
+    container.innerHTML = '';
+
     if (!people || people.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No people found. Click "Add Person" to create one.</div>';
-        return;
-    }
-    
-    let html = '';
-    people.forEach(p => {
-        const name = `${p.given_name} ${p.family_name}`;
-        const birthDate = p.birth_date ? new Date(p.birth_date).toLocaleDateString() : 'N/A';
-        
-        html += `
-            <div class="list-item">
-                <div class="list-item-header">
-                    <div class="list-item-title">${escapeHtml(name)}</div>
-                </div>
-                <div class="list-item-details">
-                    <div><strong>Birth:</strong> ${birthDate}</div>
-                    <div><strong>Place:</strong> ${escapeHtml(p.birth_place || 'N/A')}</div>
-                    <div><strong>Gender:</strong> ${escapeHtml(p.gender || 'N/A')}</div>
-                </div>
-                <div class="list-item-actions">
-                    <button class="btn-primary btn-sm" onclick="editPerson(${p.id})">Edit</button>
-                    <button class="btn-delete btn-sm" onclick="deletePerson(${p.id}, '${escapeJs(name)}')">Delete</button>
-                </div>
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">👤</div>
+                <h3>No Family Members</h3>
+                <p>Start by adding your first family member</p>
+                <button onclick="showAddPerson()" class="btn-primary">
+                    Add First Person
+                </button>
             </div>
         `;
+        return;
+    }
+
+    people.forEach(p => {
+        const birthDate = p.birth_date ? new Date(p.birth_date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }) : 'Birth date not set';
+        
+        const card = document.createElement('div');
+        card.className = 'person-card';
+        card.innerHTML = `
+            <div class="person-avatar">
+                <img src="${imageUrl(p.photo)}" 
+                     alt="${escapeHtml(p.given_name)}"
+                     onerror="this.src='img/avatar-placeholder.png'"
+                     class="person-avatar-img">
+            </div>
+            <div class="person-info">
+                <h3 class="person-name">
+                    ${escapeHtml(p.given_name)} ${escapeHtml(p.family_name)}
+                </h3>
+                <p class="person-birth">${birthDate}</p>
+                <div class="person-meta">
+                    <span class="person-gender">${p.gender || 'Not specified'}</span>
+                    ${p.death_date ? '<span class="person-status deceased">Deceased</span>' : '<span class="person-status alive">Alive</span>'}
+                </div>
+            </div>
+            <div class="person-actions">
+                <button class="btn-icon" onclick="event.stopPropagation(); editPerson(${p.id})" title="Edit">✏️</button>
+            </div>
+        `;
+        
+        card.onclick = () => editPerson(p.id);
+        container.appendChild(card);
     });
-    
-    container.innerHTML = html;
 }
 
 async function editPerson(id) {
@@ -410,24 +551,27 @@ async function editPerson(id) {
             
             hideAllMainSections();
             document.getElementById('personFormSection').classList.remove('hidden');
-            document.getElementById('formTitle').textContent = 'Edit Person';
+            document.getElementById('personFormTitle').textContent = 'Edit Person';
             document.getElementById('submitBtn').textContent = 'Update Person';
-            document.getElementById('personId').value = id;
+            document.getElementById('deletePersonBtn').classList.remove('hidden');
+            
+            document.getElementById('personId').value = p.id;
             document.getElementById('givenName').value = p.given_name || '';
             document.getElementById('familyName').value = p.family_name || '';
             document.getElementById('gender').value = p.gender || '';
+            document.getElementById('lifeStatus').value = p.death_date ? 'deceased' : 'alive';
             document.getElementById('birthDate').value = p.birth_date ? p.birth_date.substring(0, 10) : '';
+            document.getElementById('deathDate').value = p.death_date ? p.death_date.substring(0, 10) : '';
             document.getElementById('birthPlace').value = p.birth_place || '';
             document.getElementById('bio').value = p.bio || '';
+            document.getElementById('personAvatar').src = imageUrl(p.photo);
             
             if (p.death_date) {
-                document.getElementById('lifeStatus').value = 'deceased';
-                document.getElementById('deathDate').value = p.death_date.substring(0, 10);
+                document.getElementById('deathDateGroup').classList.remove('hidden');
             } else {
-                document.getElementById('lifeStatus').value = 'alive';
-                document.getElementById('deathDate').value = '';
+                document.getElementById('deathDateGroup').classList.add('hidden');
             }
-            toggleDeathDate();
+            
             window.scrollTo({top: 0, behavior: 'smooth'});
         } else {
             showMessage('Error: ' + res.error, 'error');
@@ -450,9 +594,17 @@ async function updatePerson(id, personData) {
         const res = await r.json();
         
         if (res.success) {
-            showMessage('Person updated successfully', 'success');
-            resetForm();
-            showPeople();
+            if (window.newPersonPhotoUri) {
+                uploadImage(window.newPersonPhotoUri, `/people/${id}/photo`, () => {
+                    showMessage('Person updated with photo', 'success');
+                    resetPersonForm();
+                    showPeople();
+                });
+            } else {
+                showMessage('Person updated successfully', 'success');
+                resetPersonForm();
+                showPeople();
+            }
         } else {
             showMessage('Error: ' + res.error, 'error');
         }
@@ -461,39 +613,38 @@ async function updatePerson(id, personData) {
     }
 }
 
-async function deletePerson(id, name) {
-    if (!confirm(`Delete ${name}?`)) return;
-    
-    try {
-        const r = await fetch(`${CONFIG.API_URL}/people/${id}`, {
-            method: 'DELETE',
-            headers: {'Authorization': `Bearer ${authToken}`}
-        });
-        const res = await r.json();
-        
-        if (res.success) {
-            showMessage('Person deleted successfully', 'success');
-            loadPeople();
-        } else {
-            showMessage('Error: ' + res.error, 'error');
+async function deletePerson(id) {
+    showConfirmModal('Delete this person? This will also delete all their relationships and events.', async () => {
+        try {
+            const r = await fetch(`${CONFIG.API_URL}/people/${id}`, {
+                method: 'DELETE',
+                headers: {'Authorization': `Bearer ${authToken}`}
+            });
+            const res = await r.json();
+            
+            if (res.success) {
+                showMessage('Person deleted successfully', 'success');
+                resetPersonForm();
+                showPeople();
+            } else {
+                showMessage('Error: ' + res.error, 'error');
+            }
+        } catch (err) {
+            showMessage('Connection error: ' + err.message, 'error');
         }
-    } catch (err) {
-        showMessage('Connection error: ' + err.message, 'error');
-    }
+    });
 }
 
-function resetForm() {
+function resetPersonForm() {
     editingId = null;
+    window.newPersonPhotoUri = null;
     document.getElementById('personForm').reset();
-    document.getElementById('formTitle').textContent = 'Add New Person';
-    document.getElementById('submitBtn').textContent = 'Add Person';
     document.getElementById('personId').value = '';
-    document.getElementById('lifeStatus').value = 'alive';
-    toggleDeathDate();
+    document.getElementById('personAvatar').src = 'img/avatar-placeholder.png';
 }
 
 function cancelAddEdit() {
-    resetForm();
+    resetPersonForm();
     showHome();
 }
 
@@ -501,8 +652,13 @@ function cancelAddEdit() {
 function showAddRelationship() {
     hideAllMainSections();
     document.getElementById('relationshipsSection').classList.remove('hidden');
-    document.getElementById('relationshipForm').classList.remove('hidden');
-    document.getElementById('relationshipsList').classList.add('hidden');
+    document.getElementById('relationshipFormTitle').textContent = 'Add Relationship';
+    document.getElementById('relSubmitBtn').textContent = 'Add Relationship';
+    
+    // Show form, hide list
+    document.getElementById('relationshipForm').style.display = 'block';
+    document.getElementById('relationshipsList').style.display = 'none';
+    
     fillRelationTypes();
     loadPeopleOptionsForRelationships();
     resetRelationshipForm();
@@ -511,8 +667,11 @@ function showAddRelationship() {
 function showViewRelationships() {
     hideAllMainSections();
     document.getElementById('relationshipsSection').classList.remove('hidden');
-    document.getElementById('relationshipForm').classList.add('hidden');
-    document.getElementById('relationshipsList').classList.remove('hidden');
+    
+    // Hide form, show list
+    document.getElementById('relationshipForm').style.display = 'none';
+    document.getElementById('relationshipsList').style.display = 'block';
+    
     loadRelationships();
 }
 
@@ -525,6 +684,22 @@ function fillRelationTypes() {
         opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
         sel.appendChild(opt);
     });
+}
+
+function handleRelPersonSelectChange(event) {
+    const person1Select = document.getElementById('relPerson1');
+    const person2Select = document.getElementById('relPerson2');
+    const person1Id = person1Select.value;
+    const person2Id = person2Select.value;
+    
+    if (person1Id && person2Id && person1Id === person2Id) {
+        showRelMessage('A person cannot have a relationship with themselves', 'error');
+        if (event.target.id === 'relPerson1') {
+            person2Select.value = '';
+        } else {
+            person1Select.value = '';
+        }
+    }
 }
 
 async function loadPeopleOptionsForRelationships() {
@@ -540,26 +715,36 @@ async function loadPeopleOptionsForRelationships() {
         }
         
         const people = res.data || [];
-        fillPersonSelect('relPerson1', people);
-        fillPersonSelect('relPerson2', people);
+        const person1Select = document.getElementById('relPerson1');
+        const person2Select = document.getElementById('relPerson2');
+        
+        person1Select.innerHTML = '<option value="">Select person...</option>';
+        people.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.given_name} ${p.family_name}`;
+            person1Select.appendChild(opt);
+        });
+        
+        person2Select.innerHTML = '<option value="">Select person...</option>';
+        people.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.given_name} ${p.family_name}`;
+            person2Select.appendChild(opt);
+        });
     } catch (err) {
         showRelMessage('Connection error: ' + err.message, 'error');
     }
 }
 
-function fillPersonSelect(selectId, people) {
-    const sel = document.getElementById(selectId);
-    sel.innerHTML = '<option value="">Select person...</option>';
-    people.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.given_name} ${p.family_name}`;
-        sel.appendChild(opt);
-    });
-}
-
-function handleRelPersonSelectChange(event) {
-    // Future: could add "Add new person" option here
+function showRelMessage(msg, type) {
+    const box = document.getElementById('relMessage');
+    box.textContent = msg;
+    box.className = 'message ' + (type === 'error' ? 'error' : 'success');
+    box.style.display = 'block';
+    window.scrollTo({top: 0, behavior: 'smooth'});
+    setTimeout(() => box.style.display = 'none', 4000);
 }
 
 async function onRelationshipFormSubmit(e) {
@@ -597,7 +782,7 @@ async function createRelationship(payload) {
         if (res.success) {
             showRelMessage('Relationship added successfully', 'success');
             resetRelationshipForm();
-            loadRelationships();
+            setTimeout(() => showViewRelationships(), 1000);
         } else {
             showRelMessage(res.error || 'Error creating relationship', 'error');
         }
@@ -621,7 +806,7 @@ async function updateRelationship(id, payload) {
         if (res.success) {
             showRelMessage('Relationship updated successfully', 'success');
             resetRelationshipForm();
-            loadRelationships();
+            setTimeout(() => showViewRelationships(), 1000);
         } else {
             showRelMessage(res.error || 'Error updating relationship', 'error');
         }
@@ -655,51 +840,92 @@ function displayRelationships(rels) {
     const container = document.getElementById('relationshipsList');
     
     if (!rels.length) {
-        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No relationships found.</div>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🔗</div>
+                <h3>No Relationships</h3>
+                <p>Add relationships between family members</p>
+                <button onclick="showAddRelationship()" class="btn-primary">Add Relationship</button>
+            </div>
+        `;
         return;
     }
     
-    let html = '';
+    container.innerHTML = '';
     rels.forEach(r => {
         const relType = (r.type || '').charAt(0).toUpperCase() + (r.type || '').slice(1);
         
-        html += `
-            <div class="list-item">
-                <div class="list-item-header">
-                    <div class="list-item-title">${escapeHtml(r.person1_name || '')}</div>
-                </div>
-                <div class="list-item-details">
-                    <div><strong>${relType}</strong> of ${escapeHtml(r.person2_name || '')}</div>
-                </div>
-                <div class="list-item-actions">
-                    <button class="btn-delete btn-sm" onclick="deleteRelationship(${r.id})">Delete</button>
-                </div>
+        const item = document.createElement('div');
+        item.className = 'person-card';
+        item.innerHTML = `
+            <div class="person-info" style="flex: 1;">
+                <h3 class="person-name">${escapeHtml(r.person1_name || '')}</h3>
+                <p class="person-birth"><strong>${relType}</strong> of ${escapeHtml(r.person2_name || '')}</p>
+            </div>
+            <div class="person-actions">
+                <button class="btn-icon" onclick="editRelationship(${r.id})" title="Edit">✏️</button>
+                <button class="btn-icon" onclick="deleteRelationship(${r.id})" title="Delete" style="color: var(--danger);">🗑️</button>
             </div>
         `;
+        container.appendChild(item);
     });
-    
-    container.innerHTML = html;
 }
 
-async function deleteRelationship(id) {
-    if (!confirm('Delete this relationship?')) return;
-    
+async function editRelationship(id) {
     try {
         const r = await fetch(`${CONFIG.API_URL}/relationships/${id}`, {
-            method: 'DELETE',
             headers: {'Authorization': `Bearer ${authToken}`}
         });
         const res = await r.json();
         
         if (res.success) {
-            showRelMessage('Relationship deleted successfully', 'success');
-            loadRelationships();
+            const rel = res.data;
+            editingRelationshipId = id;
+            
+            hideAllMainSections();
+            document.getElementById('relationshipsSection').classList.remove('hidden');
+            document.getElementById('relationshipFormTitle').textContent = 'Edit Relationship';
+            document.getElementById('relSubmitBtn').textContent = 'Update Relationship';
+            
+            document.getElementById('relationshipForm').style.display = 'block';
+            document.getElementById('relationshipsList').style.display = 'none';
+            
+            await loadPeopleOptionsForRelationships();
+            await fillRelationTypes();
+            
+            document.getElementById('relationshipId').value = rel.id;
+            document.getElementById('relPerson1').value = rel.person1_id;
+            document.getElementById('relPerson2').value = rel.person2_id;
+            document.getElementById('relType').value = rel.type;
+            
+            window.scrollTo({top: 0, behavior: 'smooth'});
         } else {
-            showRelMessage(res.error || 'Error deleting relationship', 'error');
+            showRelMessage('Error: ' + res.error, 'error');
         }
     } catch (err) {
         showRelMessage('Connection error: ' + err.message, 'error');
     }
+}
+
+async function deleteRelationship(id) {
+    showConfirmModal('Delete this relationship?', async () => {
+        try {
+            const r = await fetch(`${CONFIG.API_URL}/relationships/${id}`, {
+                method: 'DELETE',
+                headers: {'Authorization': `Bearer ${authToken}`}
+            });
+            const res = await r.json();
+
+            if (res.success) {
+                showRelMessage('Relationship deleted successfully', 'success');
+                loadRelationships();
+            } else {
+                showRelMessage(res.error || 'Error deleting relationship', 'error');
+            }
+        } catch (err) {
+            showRelMessage('Connection error: ' + err.message, 'error');
+        }
+    });
 }
 
 function resetRelationshipForm() {
@@ -709,21 +935,16 @@ function resetRelationshipForm() {
     document.getElementById('relSubmitBtn').textContent = 'Add Relationship';
 }
 
-function showRelMessage(msg, type) {
-    const box = document.getElementById('relMessage');
-    box.textContent = msg;
-    box.className = 'message ' + (type === 'error' ? 'error' : 'success');
-    box.style.display = 'block';
-    window.scrollTo({top: 0, behavior: 'smooth'});
-    setTimeout(() => box.style.display = 'none', 4000);
-}
-
 // ===== EVENTS =====
 function showAddEvent() {
     hideAllMainSections();
     document.getElementById('eventsSection').classList.remove('hidden');
-    document.getElementById('eventForm').classList.remove('hidden');
-    document.getElementById('eventsList').classList.add('hidden');
+    document.getElementById('eventFormTitle').textContent = 'Add Event';
+    document.getElementById('eventSubmitBtn').textContent = 'Add Event';
+    
+    document.getElementById('eventForm').style.display = 'block';
+    document.getElementById('eventsList').style.display = 'none';
+    
     loadPeopleOptionsForEvents();
     resetEventForm();
 }
@@ -731,8 +952,10 @@ function showAddEvent() {
 function showViewEvents() {
     hideAllMainSections();
     document.getElementById('eventsSection').classList.remove('hidden');
-    document.getElementById('eventForm').classList.add('hidden');
-    document.getElementById('eventsList').classList.remove('hidden');
+    
+    document.getElementById('eventForm').style.display = 'none';
+    document.getElementById('eventsList').style.display = 'block';
+    
     loadEvents();
 }
 
@@ -799,7 +1022,7 @@ async function createEvent(payload) {
         if (res.success) {
             showEventMessage('Event added successfully', 'success');
             resetEventForm();
-            loadEvents();
+            setTimeout(() => showViewEvents(), 1000);
         } else {
             showEventMessage(res.error || 'Error creating event', 'error');
         }
@@ -823,7 +1046,7 @@ async function updateEvent(id, payload) {
         if (res.success) {
             showEventMessage('Event updated successfully', 'success');
             resetEventForm();
-            loadEvents();
+            setTimeout(() => showViewEvents(), 1000);
         } else {
             showEventMessage(res.error || 'Error updating event', 'error');
         }
@@ -857,54 +1080,99 @@ function displayEvents(events) {
     const container = document.getElementById('eventsList');
     
     if (!events.length) {
-        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">No events found.</div>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📅</div>
+                <h3>No Events</h3>
+                <p>Add family events and milestones</p>
+                <button onclick="showAddEvent()" class="btn-primary">Add Event</button>
+            </div>
+        `;
         return;
     }
     
-    let html = '';
+    container.innerHTML = '';
     events.forEach(ev => {
-        const dateText = ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '-';
+        const dateText = ev.event_date ? new Date(ev.event_date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        }) : 'Date not set';
         
-        html += `
-            <div class="list-item">
-                <div class="list-item-header">
-                    <div class="list-item-title">${escapeHtml(ev.title || '')}</div>
-                </div>
-                <div class="list-item-details">
-                    <div><strong>Person:</strong> ${escapeHtml(ev.person_name || '')}</div>
-                    <div><strong>Date:</strong> ${dateText}</div>
-                    ${ev.place ? `<div><strong>Place:</strong> ${escapeHtml(ev.place)}</div>` : ''}
-                    ${ev.description ? `<div>${escapeHtml(ev.description)}</div>` : ''}
-                </div>
-                <div class="list-item-actions">
-                    <button class="btn-delete btn-sm" onclick="deleteEvent(${ev.id})">Delete</button>
-                </div>
+        const item = document.createElement('div');
+        item.className = 'person-card';
+        item.innerHTML = `
+            <div class="person-info" style="flex: 1;">
+                <h3 class="person-name">${escapeHtml(ev.title || '')}</h3>
+                <p class="person-birth">${escapeHtml(ev.person_name || '')} • ${dateText}</p>
+                ${ev.place ? `<p class="person-birth" style="margin-top: 0.25rem;">📍 ${escapeHtml(ev.place)}</p>` : ''}
+                ${ev.description ? `<p class="person-birth" style="margin-top: 0.25rem; font-size: 0.85rem;">${escapeHtml(ev.description)}</p>` : ''}
+            </div>
+            <div class="person-actions">
+                <button class="btn-icon" onclick="editEvent(${ev.id})" title="Edit">✏️</button>
+                <button class="btn-icon" onclick="deleteEvent(${ev.id})" title="Delete" style="color: var(--danger);">🗑️</button>
             </div>
         `;
+        container.appendChild(item);
     });
-    
-    container.innerHTML = html;
 }
 
-async function deleteEvent(id) {
-    if (!confirm('Delete this event?')) return;
-    
+async function editEvent(id) {
     try {
         const r = await fetch(`${CONFIG.API_URL}/events/${id}`, {
-            method: 'DELETE',
             headers: {'Authorization': `Bearer ${authToken}`}
         });
         const res = await r.json();
         
         if (res.success) {
-            showEventMessage('Event deleted successfully', 'success');
-            loadEvents();
+            const ev = res.data;
+            editingEventId = id;
+            
+            hideAllMainSections();
+            document.getElementById('eventsSection').classList.remove('hidden');
+            document.getElementById('eventFormTitle').textContent = 'Edit Event';
+            document.getElementById('eventSubmitBtn').textContent = 'Update Event';
+            
+            document.getElementById('eventForm').style.display = 'block';
+            document.getElementById('eventsList').style.display = 'none';
+            
+            await loadPeopleOptionsForEvents();
+            
+            document.getElementById('eventId').value = ev.id;
+            document.getElementById('eventPerson').value = ev.created_by;
+            document.getElementById('eventTitle').value = ev.title || '';
+            document.getElementById('eventDate').value = ev.event_date ? ev.event_date.substring(0, 10) : '';
+            document.getElementById('eventPlace').value = ev.place || '';
+            document.getElementById('eventDescription').value = ev.description || '';
+            
+            window.scrollTo({top: 0, behavior: 'smooth'});
         } else {
-            showEventMessage(res.error || 'Error deleting event', 'error');
+            showEventMessage('Error: ' + res.error, 'error');
         }
     } catch (err) {
         showEventMessage('Connection error: ' + err.message, 'error');
     }
+}
+
+async function deleteEvent(id) {
+    showConfirmModal('Delete this event?', async () => {
+        try {
+            const r = await fetch(`${CONFIG.API_URL}/events/${id}`, {
+                method: 'DELETE',
+                headers: {'Authorization': `Bearer ${authToken}`}
+            });
+            const res = await r.json();
+            
+            if (res.success) {
+                showEventMessage('Event deleted successfully', 'success');
+                loadEvents();
+            } else {
+                showEventMessage(res.error || 'Error deleting event', 'error');
+            }
+        } catch (err) {
+            showEventMessage('Connection error: ' + err.message, 'error');
+        }
+    });
 }
 
 function resetEventForm() {
@@ -923,113 +1191,26 @@ function showEventMessage(msg, type) {
     setTimeout(() => box.style.display = 'none', 4000);
 }
 
-// ===== CAMERA PLUGIN =====
-let currentPhotoData = null;
-
-function takePhoto() {
-    if (!navigator.camera) {
-        alert('Camera plugin not available');
-        return;
+// ===== UTILITY =====
+function dataURItoBlob(data) {
+    if (data instanceof Blob) {
+        return data;
     }
-    
-    navigator.camera.getPicture(
-        function(imageData) {
-            currentPhotoData = imageData;
-            const photoPreview = document.getElementById('photoPreview');
-            if (photoPreview) {
-                photoPreview.src = "data:image/jpeg;base64," + imageData;
-                photoPreview.style.display = 'block';
-            }
-            showMessage('Photo captured successfully', 'success');
-        },
-        function(error) {
-            showMessage('Camera error: ' + error, 'error');
-        },
-        {
-            quality: 75,
-            destinationType: Camera.DestinationType.DATA_URL,
-            sourceType: Camera.PictureSourceType.CAMERA,
-            encodingType: Camera.EncodingType.JPEG,
-            targetWidth: 800,
-            targetHeight: 800,
-            correctOrientation: true
-        }
-    );
-}
 
-function selectFromGallery() {
-    if (!navigator.camera) {
-        alert('Camera plugin not available');
-        return;
+    if (!data.startsWith('data:')) {
+        throw new Error('Expected Base64 data URL, got: ' + data.substring(0, 30));
     }
-    
-    navigator.camera.getPicture(
-        function(imageData) {
-            currentPhotoData = imageData;
-            const photoPreview = document.getElementById('photoPreview');
-            if (photoPreview) {
-                photoPreview.src = "data:image/jpeg;base64," + imageData;
-                photoPreview.style.display = 'block';
-            }
-            showMessage('Photo selected successfully', 'success');
-        },
-        function(error) {
-            showMessage('Gallery error: ' + error, 'error');
-        },
-        {
-            quality: 75,
-            destinationType: Camera.DestinationType.DATA_URL,
-            sourceType: Camera.PictureSourceType.PHOTOLIBRARY,
-            encodingType: Camera.EncodingType.JPEG,
-            targetWidth: 800,
-            targetHeight: 800
-        }
-    );
-}
 
-// ===== GEOLOCATION PLUGIN =====
-function getCurrentLocation() {
-    if (!navigator.geolocation) {
-        alert('Geolocation plugin not available');
-        return;
+    const parts = data.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const byteString = atob(parts[1]);
+
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
     }
-    
-    showMessage('Getting location...', 'success');
-    
-    navigator.geolocation.getCurrentPosition(
-        function(position) {
-            const lat = position.coords.latitude.toFixed(6);
-            const lon = position.coords.longitude.toFixed(6);
-            const accuracy = position.coords.accuracy.toFixed(0);
-            
-            const locationInput = document.getElementById('birthPlace');
-            if (locationInput) {
-                locationInput.value = `Lat: ${lat}, Lon: ${lon} (±${accuracy}m)`;
-            }
-            
-            showMessage(`Location captured: ${lat}, ${lon}`, 'success');
-        },
-        function(error) {
-            let errorMsg = 'Location error: ';
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMsg += 'Permission denied';
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMsg += 'Position unavailable';
-                    break;
-                case error.TIMEOUT:
-                    errorMsg += 'Timeout';
-                    break;
-                default:
-                    errorMsg += error.message;
-            }
-            showMessage(errorMsg, 'error');
-        },
-        {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-        }
-    );
+
+    return new Blob([ab], { type: mime });
 }

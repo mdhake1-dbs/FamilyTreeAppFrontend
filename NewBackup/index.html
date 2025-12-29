@@ -10,15 +10,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta http-equiv="Content-Security-Policy"
-          content="
-            default-src 'self' data: gap: https://ssl.gstatic.com https://familytreeapp.duckdns.org;
-            img-src 'self' data: blob: https://familytreeapp.duckdns.org;
-            style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-            font-src 'self' data: https://fonts.gstatic.com;
-            script-src 'self' 'unsafe-inline' 'unsafe-eval';
-            connect-src 'self' https://familytreeapp.duckdns.org;
-            media-src *;
-          ">
+ content="
+   default-src 'self' data: gap: https://ssl.gstatic.com https://familytreeapp.duckdns.org;
+   img-src 'self' data: blob: https://familytreeapp.duckdns.org;
+   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+   font-src 'self' data: https://fonts.gstatic.com;
+   script-src 'self' 'unsafe-inline' 'unsafe-eval';
+   connect-src 'self' https://familytreeapp.duckdns.org;
+   media-src *;
+ ">
     <title>Family Tree Manager</title>
     <link rel="stylesheet" href="css/styles.css" />
   </head>
@@ -99,14 +99,14 @@
           />
         </div>
         <div class="form-group">
-          <label>Email (required)</label>
+          <label>Email (optional)</label>
          <input
-            id="regEmail"
-            type="email"
-            placeholder="Enter email"
-            autocomplete="email"
-            required
-            />
+	  id="regEmail"
+	  type="email"
+	  placeholder="Enter email"
+	  autocomplete="email"
+	  required
+	  />
         </div>
         <div class="form-group">
           <label>Full Name (optional)</label>
@@ -212,78 +212,73 @@
       <div class="main-content">
         <div id="messageBox" class="message"></div>
 
-        <!-- HOME PAGE -->
+        <!-- HOMEPAGE -->
         <div id="homePage" class="section">
           <div class="home-card">
             <div class="home-icon">👨‍👩‍👧‍👦</div>
             <h2>Welcome to Your Family Tree</h2>
             <p class="home-text">
-              Build and explore your family history with ease
+              Manage your family members, record relationships, track important
+              events, and preserve your family history for generations to come.
             </p>
             <div class="home-actions">
-              <button class="btn-primary" onclick="showAddPerson()">
-                Add Person
+              <button
+                class="btn-primary"
+                type="button"
+                onclick="showAddPerson()"
+              >
+                <span class="btn-icon">➕</span> Add Person
               </button>
-              <button class="btn-secondary" onclick="showPeople()">
-                View People
+              <button
+                class="btn-secondary"
+                type="button"
+                onclick="showPeople()"
+              >
+                <span class="btn-icon">👥</span> View People
               </button>
             </div>
           </div>
         </div>
 
-        <!-- PROFILE SECTION -->
-        <div id="profileSection" class="section hidden">
-          <div class="card">
-            <h2 class="card-header">Profile</h2>
-            <form id="profileForm">
-              <div class="profile-avatar-wrapper">
-                <img
-                  id="profileAvatar"
-                  class="profile-avatar"
-                  src="img/avatar-placeholder.png"
-                  alt="Profile"
-                />
-                <button
-                  type="button"
-                  class="camera-btn"
-                  onclick="changeProfilePhoto()"
-                >
-                  📷
-                </button>
-              </div>
+        <!-- PROFILE SECTION (UPDATED) -->
+        <div id="profileSection" class="hidden section">
+          <div class="card profile-card">
+            <div class="profile-avatar-wrapper">
+              <img
+                id="profileAvatar"
+                class="profile-avatar"
+                src="img/avatar-placeholder.png"
+              />
+              <button
+                class="camera-btn"
+                type="button"
+                onclick="changeProfilePhoto()"
+              >
+                📷
+              </button>
+            </div>
 
+            <h2 class="card-header">Edit Profile</h2>
+            <div id="profileMsg" class="message"></div>
+
+            <form id="profileForm" onsubmit="event.preventDefault();">
               <div class="form-group">
                 <label>Full Name</label>
-                <input
-                  id="profileFullName"
-                  type="text"
-                  placeholder="Enter full name"
-                />
+                <input id="profileFullName" type="text" />
               </div>
-
               <div class="form-group">
                 <label>Email</label>
-                <input
-                  id="profileEmail"
-                  type="email"
-                  placeholder="Enter email"
-                />
+                <input id="profileEmail" type="email" />
               </div>
-
               <div class="form-group">
                 <label>New Password</label>
-                <input
-                  id="profilePassword"
-                  type="password"
-                  placeholder="Leave blank to keep current"
-                />
+                <input id="profilePassword" type="password" />
               </div>
-
               <div class="form-actions">
                 <button
                   type="button"
                   class="btn-primary"
-                  onclick="updateProfile()"
+                  onclick="saveProfile()"
                 >
                   Save Changes
                 </button>
@@ -302,28 +297,9 @@
         <!-- ADD/EDIT PERSON FORM -->
         <div id="personFormSection" class="section hidden">
           <div class="card">
-            <h2 class="card-header" id="personFormTitle">Add New Person</h2>
-
+            <h2 id="formTitle" class="card-header">Add New Person</h2>
             <form id="personForm">
               <input type="hidden" id="personId" />
-
-              <div class="form-header">
-                <div class="form-avatar">
-                  <img
-                    id="personAvatar"
-                    class="form-avatar-img"
-                    src="img/avatar-placeholder.png"
-                    alt="Person"
-                  />
-                  <button
-                    type="button"
-                    class="form-avatar-btn"
-                    onclick="changePersonPhoto()"
-                  >
-                    📷
-                  </button>
-                </div>
-              </div>
 
               <div class="form-row">
                 <div class="form-group">
@@ -404,14 +380,6 @@
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  id="deletePersonBtn"
-                  class="btn-delete hidden"
-                  onclick="deletePerson(editingId)"
-                >
-                  Delete Person
-                </button>
               </div>
             </form>
           </div>
@@ -444,7 +412,7 @@
         <!-- RELATIONSHIPS SECTION -->
         <div id="relationshipsSection" class="section hidden">
           <div class="card">
-            <h2 class="card-header" id="relationshipFormTitle">Add Relationship</h2>
+            <h2 class="card-header">Relationships</h2>
             <div id="relMessage" class="message"></div>
 
             <form id="relationshipForm">
@@ -492,7 +460,7 @@
         <!-- EVENTS SECTION -->
         <div id="eventsSection" class="section hidden">
           <div class="card">
-            <h2 class="card-header" id="eventFormTitle">Add Event</h2>
+            <h2 class="card-header">Events</h2>
             <div id="eventMessage" class="message"></div>
 
             <form id="eventForm">
@@ -552,25 +520,26 @@
           </div>
         </div>
       </div>
-      
-      <!-- Confirmation Modal (Single Reusable) -->
-      <div id="confirmModal" class="modal">
+      <div id="customConfirm" class="modal">
         <div class="modal-content">
-          <p id="confirmMessage">Are you sure?</p>
-          <div class="modal-actions">
-            <button id="confirmYes" class="btn-primary">Yes</button>
-            <button id="confirmNo" class="btn-secondary">No</button>
-          </div>
+          <p>Delete this event?</p>
+          <button id="yesBtn">Yes</button>
+          <button id="noBtn">No</button>
         </div>
       </div>
-    </div>
-    
-    <!-- Media Picker -->
-    <div id="mediaPicker" class="media-picker hidden">
-      <div class="media-sheet">
-        <button onclick="pickCamera()">📷 Camera</button>
-        <button onclick="pickGallery()">🖼 Photos</button>
-        <button class="cancel" onclick="closeMediaPicker()">Cancel</button>
+      <div id="customConfirmPerson" class="modal">
+        <div class="modal-content">
+          <p>Delete this person?</p>
+          <button id="yesBtnPerson">Yes</button>
+          <button id="noBtnPerson">No</button>
+        </div>
+      </div>
+      <div id="customConfirmRelationship" class="modal">
+        <div class="modal-content">
+          <p>Delete this relationship?</p>
+          <button id="yesBtnRelationship">Yes</button>
+          <button id="noBtnRelationship">No</button>
+        </div>
       </div>
     </div>
 
