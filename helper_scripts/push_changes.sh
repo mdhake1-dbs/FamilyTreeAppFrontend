@@ -20,7 +20,7 @@ fi
 
 # Stage, commit, and push
 git add .
-git commit -m "Working App V2"
+git commit -m "Submission Ready App with Google-API"
 git branch -M main
 git push -u origin main
 

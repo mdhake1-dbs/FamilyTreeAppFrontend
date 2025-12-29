@@ -806,3 +806,31 @@ textarea { resize: vertical; min-height: 100px; }
 .list-container {
     margin-top: 1rem;
 }
+
+.location-suggestions {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.location-suggestions div {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.location-suggestions div:last-child {
+  border-bottom: none;
+}
+
+.location-suggestions div:hover {
+  background: #f1f5f9;
+}
+

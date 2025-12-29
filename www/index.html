@@ -302,7 +302,7 @@
                     class="form-avatar-btn"
                     onclick="changePersonPhoto()"
                   >
-                    📷
+                    📝
                   </button>
                 </div>
               </div>
@@ -357,27 +357,40 @@
                 <input id="deathDate" type="date" />
               </div>
 
-              <div class="form-group">
+<div class="form-group">
   <label>Birth Place</label>
 
   <div class="form-row">
     <input
       id="birthPlace"
       type="text"
-      placeholder="City, Country"
+      placeholder="Search location"
+      oninput="searchLocation(this.value, 'birth')"
+      autocomplete="off"
     />
+
     <button
       type="button"
       class="btn-secondary btn-sm"
       onclick="fillBirthPlaceFromGPS()"
     >
-      📍 Use Current Location
+      📍 Current
     </button>
+    <button
+  type="button"
+  class="btn-secondary btn-sm"
+  onclick="openMapPicker('birth')"
+>
+  🗺 Pick
+</button>
   </div>
+
+  <div id="birthSuggestions" class="location-suggestions"></div>
 
   <!-- hidden geo fields -->
   <input type="hidden" id="birthLat" />
   <input type="hidden" id="birthLng" />
+  <input type="hidden" id="birthDigipin" />
 </div>
 
               <div class="form-group">
@@ -413,7 +426,7 @@
           </div>
         </div>
         <div id="personFormSectionView" class="section hidden">
-          <h1>ahah</h1>
+          
         </div>
 
         <!-- PEOPLE LIST -->
@@ -489,7 +502,6 @@
         </div>
 
         <div id="relationshipsSectionView" class="section hidden">
-          <h1>ahahah</h1>
         </div>
 
         <!-- EVENTS SECTION -->
@@ -522,29 +534,42 @@
                 <label>Date</label>
                 <input id="eventDate" type="date" />
               </div>
-
-              <div class="form-group">
+<div class="form-group">
   <label>Place</label>
 
   <div class="form-row">
     <input
       id="eventPlace"
       type="text"
-      placeholder="Location"
+      placeholder="Search location"
+      oninput="searchLocation(this.value, 'event')"
+      autocomplete="off"
     />
+
     <button
       type="button"
       class="btn-secondary btn-sm"
       onclick="fillEventPlaceFromGPS()"
     >
-      📍 Use Current Location
+      📍 Current
     </button>
+    <button
+  type="button"
+  class="btn-secondary btn-sm"
+  onclick="openMapPicker('event')"
+>
+  🗺 Pick
+</button>
+    
   </div>
 
+  <div id="eventSuggestions" class="location-suggestions"></div>
+
+  <!-- hidden geo fields -->
   <input type="hidden" id="eventLat" />
   <input type="hidden" id="eventLng" />
+  <input type="hidden" id="eventDigipin" />
 </div>
-
 
               <div class="form-group">
                 <label>Description</label>
@@ -585,8 +610,15 @@
         </div>
       </div>
     </div>
-
+<!-- MAP PICKER MODAL -->
+<div id="mapPickerModal" class="modal">
+  <div class="modal-content" style="padding:0; width:95%; height:80%;">
+    <div id="mapPicker" style="width:100%; height:100%;"></div>
+  </div>
+</div>
     <script type="text/javascript" src="cordova.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD2rrqr-TNWJAozPqdPJlrpzOj62uBotco"></script>
+
     <script src="js/config.js"></script>
     <script src="js/app.js"></script>
   </body>

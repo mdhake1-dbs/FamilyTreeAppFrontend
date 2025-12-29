@@ -4,14 +4,32 @@ let currentUser = null;
 let editingId = null;
 let editingRelationshipId = null;
 let editingEventId = null;
+let mapPickerMap;
+let mapPickerMarker;
+let activePickerType = null;
 
-// Cordova initialization
-document.addEventListener('deviceready', onDeviceReady, false);
+document.addEventListener('deviceready', () => {
+  // Hide splash screen
+  if (navigator.splashscreen) {
+    navigator.splashscreen.hide();
+  }
 
-function onDeviceReady() {
-    if (navigator.splashscreen) navigator.splashscreen.hide();
-    initializeApp();
-}
+  // Handle Android back button
+  document.addEventListener(
+    'backbutton',
+    (e) => {
+      e.preventDefault(); // prevent app from closing
+
+      if (confirm('Do you really want to exit the app?')) {
+        navigator.app.exitApp();
+      }
+    },
+    false
+  );
+
+  // Initialize app
+  initializeApp();
+}, false);
 
 // Browser fallback
 if (!window.cordova) {
@@ -549,10 +567,7 @@ async function viewPerson(p){
                 )} ${escapeHtml(p.family_name || "")} - ${escapeHtml(
        p.gender || ""
      )}</h3>
- ${
-   p.birth_date &&
-   `<p class="person-birth">Birth date : ${escapeHtml(p.birth_date)}</p>`
- }
+${p.birth_date ? `<p class="person-birth">Birth date : ${escapeHtml(p.birth_date)}</p>` : ''}
  ${
    p.death_date
      ? `<p class="person-birth">Death date : ${escapeHtml(
@@ -1293,78 +1308,31 @@ function getCurrentLocation(successCb, errorCb) {
   );
 }
 
-//Marked for Delete in next version
-/*
-async function reverseGeocode(lat, lng) {
-    console.log(lat,lng);
-    
-  const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&apiKey=73b098a774db45189daa3c4202618e68`;
-  const r = await fetch(url);
-  const j = await r.json();
-  return (
-    `${j.features[0].properties.county} | ${j.features[0].properties.city} | ${j.features[0].properties.country}` ||
-    `${lat}, ${lng}`
-  );
-}
-*/
-
-//Old Version for Safety
-/*
 async function fillBirthPlaceFromGPS() {
   getCurrentLocation(async ({ lat, lng }) => {
-    const address = await reverseGeocode(lat, lng);
+    const digipin = encodeDIGIPIN(lat, lng);
+    const placeText = await reverseGeocode(lat, lng, 'city');
 
-    document.getElementById("birthPlace").value = address;
     document.getElementById("birthLat").value = lat;
     document.getElementById("birthLng").value = lng;
-  });
-}
-*/
+    document.getElementById("birthDigipin").value = digipin;
 
-function fillBirthPlaceFromGPS() {
-  getCurrentLocation(({ lat, lng }) => {
-    const digipin = encodeDIGIPIN(lat, lng);
-
-    const latEl = document.getElementById("birthLat");
-    const lngEl = document.getElementById("birthLng");
-    const placeEl = document.getElementById("birthPlace");
-    const dpEl = document.getElementById("birthDigipin");
-
-    if (latEl) latEl.value = lat;
-    if (lngEl) lngEl.value = lng;
-    if (placeEl) placeEl.value = `DIGIPIN: ${digipin}`;
-    if (dpEl) dpEl.value = digipin;
-    
+    document.getElementById("birthPlace").value = placeText;
   });
 }
 
-//Old Function
-/*
 async function fillEventPlaceFromGPS() {
   getCurrentLocation(async ({ lat, lng }) => {
-    const address = await reverseGeocode(lat, lng);
+    const digipin = encodeDIGIPIN(lat, lng);
+    const placeText = await reverseGeocode(lat, lng, 'exact');
 
-    document.getElementById("eventPlace").value = address;
     document.getElementById("eventLat").value = lat;
     document.getElementById("eventLng").value = lng;
-  });
-}
-*/
 
-function fillEventPlaceFromGPS() {
-  getCurrentLocation(({ lat, lng }) => {
-    const digipin = encodeDIGIPIN(lat, lng);
-    
-    const latEl = document.getElementById("eventLat");
-    const lngEl = document.getElementById("eventLng");
-    const placeEl = document.getElementById("eventPlace");
-    const dpEl = document.getElementById("eventDigipin");
+    // optional: store digipin if you want
+    // document.getElementById("eventDigipin").value = digipin;
 
-    if (latEl) latEl.value = lat;
-    if (lngEl) lngEl.value = lng;
-    if (placeEl) placeEl.value = `DIGIPIN: ${digipin}`;
-    if (dpEl) dpEl.value = digipin;
-    
+    document.getElementById("eventPlace").value = placeText;
   });
 }
 
@@ -1480,3 +1448,195 @@ function encodeDIGIPIN(lat, lng, precision = 10) {
 
   return pin;
 }
+
+//Reverse Location
+async function reverseGeocode(lat, lng, level = 'city') {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
+
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json' }
+  });
+  const data = await res.json();
+  const a = data.address || {};
+
+  if (level === 'city') {
+    // Birthplace → City, Country
+    const city = a.city || a.town || a.village || '';
+    const country = a.country || '';
+    return [city, country].filter(Boolean).join(', ');
+  }
+
+  // Event → exact readable location
+  const parts = [
+    a.road,
+    a.suburb,
+    a.city || a.town || a.village,
+    a.state,
+    a.country
+  ];
+
+  return parts.filter(Boolean).join(', ');
+}
+
+let locationAbort;
+
+/*
+async function searchLocation(query, type) {
+  if (query.length < 3) return;
+
+  if (locationAbort) locationAbort.abort();
+  locationAbort = new AbortController();
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1`;
+
+  const res = await fetch(url, { signal: locationAbort.signal });
+  const results = await res.json();
+
+  const box = document.getElementById(type + 'Suggestions');
+  box.innerHTML = '';
+
+  results.slice(0, 5).forEach(r => {
+    const div = document.createElement('div');
+    div.textContent = r.display_name;
+    div.onclick = () => selectLocation(r, type);
+    box.appendChild(div);
+  });
+}
+*/
+
+async function searchLocation(query, type) {
+  if (query.length < 3) return;
+
+  const url =
+    `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+    `?input=${encodeURIComponent(query)}` +
+    `&types=geocode` +
+    `&key=AIzaSyD2rrqr-TNWJAozPqdPJlrpzOj62uBotco`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const box = document.getElementById(type + 'Suggestions');
+  box.innerHTML = '';
+
+  (data.predictions || []).slice(0, 5).forEach(p => {
+    const div = document.createElement('div');
+    div.textContent = p.description;
+    div.onclick = () => fetchPlaceDetails(p.place_id, type);
+    box.appendChild(div);
+  });
+}
+
+function selectLocation(place, type) {
+  document.getElementById(type + 'Place').value = place.display_name;
+  document.getElementById(type + 'Lat').value = place.lat;
+  document.getElementById(type + 'Lng').value = place.lon;
+
+  if (document.getElementById(type + 'Digipin')) {
+    document.getElementById(type + 'Digipin').value =
+      encodeDIGIPIN(place.lat, place.lon);
+  }
+
+  document.getElementById(type + 'Suggestions').innerHTML = '';
+}
+
+async function fetchPlaceDetails(placeId, type) {
+  const url =
+    `https://maps.googleapis.com/maps/api/place/details/json` +
+    `?place_id=${placeId}` +
+    `&fields=geometry,name,formatted_address` +
+    `&key=AIzaSyD2rrqr-TNWJAozPqdPJlrpzOj62uBotco`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const loc = data.result.geometry.location;
+
+  document.getElementById(type + 'Place').value =
+    data.result.formatted_address;
+
+  document.getElementById(type + 'Lat').value = loc.lat;
+  document.getElementById(type + 'Lng').value = loc.lng;
+
+  if (document.getElementById(type + 'Digipin')) {
+    document.getElementById(type + 'Digipin').value =
+      encodeDIGIPIN(loc.lat, loc.lng);
+  }
+
+  document.getElementById(type + 'Suggestions').innerHTML = '';
+}
+
+// Close location suggestions when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.form-group')) {
+    document.querySelectorAll('.location-suggestions')
+      .forEach(el => el.innerHTML = '');
+  }
+});
+
+function openMapPicker(type) {
+  activePickerType = type;
+
+  const modal = document.getElementById('mapPickerModal');
+  modal.style.display = 'flex';
+
+  setTimeout(initMapPicker, 300); // wait for modal render
+}
+
+function initMapPicker() {
+  const center = { lat: 20.5937, lng: 78.9629 }; // default India (safe)
+
+  mapPickerMap = new google.maps.Map(document.getElementById('mapPicker'), {
+    center,
+    zoom: 5,
+  });
+
+  mapPickerMap.addListener('click', async e => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    if (!mapPickerMarker) {
+      mapPickerMarker = new google.maps.Marker({
+        map: mapPickerMap,
+        position: e.latLng,
+      });
+    } else {
+      mapPickerMarker.setPosition(e.latLng);
+    }
+
+    await fillFromMapPick(lat, lng);
+  });
+}
+
+async function fillFromMapPick(lat, lng) {
+  const url =
+    `https://maps.googleapis.com/maps/api/geocode/json` +
+    `?latlng=${lat},${lng}` +
+    `&key=AIzaSyD2rrqr-TNWJAozPqdPJlrpzOj62uBotco`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const address = data.results?.[0]?.formatted_address || '';
+
+  document.getElementById(activePickerType + 'Place').value = address;
+  document.getElementById(activePickerType + 'Lat').value = lat;
+  document.getElementById(activePickerType + 'Lng').value = lng;
+
+  const dp = document.getElementById(activePickerType + 'Digipin');
+  if (dp) dp.value = encodeDIGIPIN(lat, lng);
+
+  closeMapPicker();
+}
+
+function closeMapPicker() {
+  const modal = document.getElementById('mapPickerModal');
+  modal.style.display = 'none';
+
+  if (mapPickerMarker) {
+    mapPickerMarker.setMap(null);
+    mapPickerMarker = null;
+  }
+}
+
+
