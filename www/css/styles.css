@@ -82,15 +82,19 @@ button {
 .btn-icon {
     background: transparent;
     border: none;
-    font-size: 1.25rem;
+    font-size: 2rem;
     padding: 0.5rem;
     min-width: 44px;
     min-height: 44px;
     cursor: pointer;
     border-radius: 0.5rem;
     transition: background 0.2s;
+    /* transform: rotate(98deg); */
 }
 
+#relationshipsList .btn-icon , #eventsList .btn-icon,#personFormSectionView .btn-icon{
+    font-size: 1rem !important;
+}
 .btn-icon:active {
     background: var(--border);
 }
@@ -377,7 +381,7 @@ textarea { resize: vertical; min-height: 100px; }
 }
 
 .home-icon { 
-    font-size: 5rem;
+    font-size: 4rem;
     margin-bottom: 1.5rem;
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
 }
@@ -421,8 +425,9 @@ textarea { resize: vertical; min-height: 100px; }
 .person-card {
     display: flex;
     align-items: center;
+  
     gap: 1rem;
-    padding: 1rem;
+    padding: 1.5rem;
     background: white;
     border-radius: 1rem;
     margin-bottom: 0.75rem;
@@ -430,6 +435,29 @@ textarea { resize: vertical; min-height: 100px; }
     border: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.2s ease;
+}
+#personFormSectionView,#relationshipsSection{
+    width: 80vw;
+}
+
+#personFormSectionView .person-avatar{
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+#personFormSectionView .person-avatar img{
+    width: 100px;
+    height: 100px;
+}
+#eventsSection .person-card,#personFormSectionView .person-card,#relationshipsList .person-card{
+    align-items: start !important;
+      flex-direction: column !important; 
+}
+#eventsSection .person-actions, #relationshipsList .person-actions,#personFormSectionView .person-actions{
+    width: 100% !important;
+    display: flex;
+    justify-content: end;
 }
 
 .person-card:active {
@@ -537,8 +565,8 @@ textarea { resize: vertical; min-height: 100px; }
     color: white;
     border: 3px solid white;
     border-radius: 50%;
-    width: 44px;
-    height: 44px;
+    width: 53px;
+    height: 53px;
     font-size: 1.2rem;
     display: flex;
     align-items: center;
@@ -639,15 +667,22 @@ textarea { resize: vertical; min-height: 100px; }
 }
 
 .camera-btn {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
     position: absolute;
     bottom: 5px;
     right: -6px;
     background: var(--primary);
     color: white;
     border-radius: 50%;
-    width: 44px;
-    height: 44px;
+    width: 53px;
+    height: 53px;
     font-size: 1.3rem;
+    display: flex;
+    justify-content: center;
+    border: 3px solid white;
+    padding-top: 6px !important;
 }
 
 /* Confirmation Modal */

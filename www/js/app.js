@@ -113,9 +113,17 @@ function showHome() {
 }
 
 function hideAllMainSections() {
-    ['homePage', 'profileSection', 'personFormSection', 'peopleSection', 
-     'relationshipsSection', 'eventsSection'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
+    [
+      "homePage",
+      "profileSection",
+      "personFormSection",
+      "peopleSection",
+      "relationshipsSection",
+      "eventsSection",
+      "personFormSectionView",
+      "relationshipsSectionView",
+    ].forEach((id) => {
+      document.getElementById(id).classList.add("hidden");
     });
     document.getElementById('messageBox').style.display = 'none';
 }
@@ -256,26 +264,6 @@ function toggleMobileMenu() {
     }
 }
 
-function changeProfilePhoto() {
-    takePhoto(imageURI => {
-        window.resolveLocalFileSystemURL(imageURI, entry => {
-            entry.file(file => {
-                const reader = new FileReader();
-
-                reader.onloadend = function () {
-                    const base64 = reader.result;
-                    document.getElementById('profileAvatar').src = base64;
-                    uploadImage(base64, '/users/profile-photo', res => {
-                        console.log('Profile photo updated', res);
-                    });
-                };
-
-                reader.readAsDataURL(file);
-            });
-        });
-    });
-}
-
 async function updateProfile() {
     const data = {
         full_name: document.getElementById('profileFullName').value,
@@ -309,7 +297,7 @@ async function updateProfile() {
 }
 
 function imageUrl(path) {
-    if (!path) return 'img/avatar-placeholder.png';
+    if (!path) return 'img/avatar.png';
     return CONFIG.API_URL.replace('/api', '') + '/' + path + '?t=' + Date.now();
 }
 
@@ -323,6 +311,8 @@ function takePhoto(callback) {
         err => alert('Camera error'),
         {
             quality: 70,
+            targetWidth: 1024,
+            targetHeight: 1024,
             destinationType: Camera.DestinationType.FILE_URI,
             encodingType: Camera.EncodingType.JPEG,
             correctOrientation: true
@@ -368,7 +358,7 @@ function showAddPerson() {
     editingId = null;
     document.getElementById('personForm').reset();
     document.getElementById('personId').value = '';
-    document.getElementById('personAvatar').src = 'img/avatar-placeholder.png';
+    document.getElementById('personAvatar').src = 'img/avatar.png';
     document.getElementById('deathDateGroup').classList.add('hidden');
     
     window.newPersonPhotoUri = null;
@@ -389,22 +379,6 @@ function toggleDeathDate() {
         group.classList.add('hidden');
         document.getElementById('deathDate').value = '';
     }
-}
-
-function changePersonPhoto() {
-    takePhoto(imageURI => {
-        window.resolveLocalFileSystemURL(imageURI, entry => {
-            entry.file(file => {
-                const reader = new FileReader();
-                reader.onloadend = function () {
-                    const base64 = reader.result;
-                    window.newPersonPhotoUri = base64;
-                    document.getElementById('personAvatar').src = base64;
-                };
-                reader.readAsDataURL(file);
-            });
-        });
-    });
 }
 
 async function onPersonFormSubmit(e) {
@@ -445,7 +419,7 @@ async function createPerson(personData) {
         const res = await r.json();
         
         if (res.success) {
-            const newPersonId = res.data.id;
+            const newPersonId = res.id;
             
             if (window.newPersonPhotoUri) {
                 uploadImage(window.newPersonPhotoUri, `/people/${newPersonId}/photo`, (photoRes) => {
@@ -506,19 +480,21 @@ function displayPeople(people) {
     }
 
     people.forEach(p => {
-        const birthDate = p.birth_date ? new Date(p.birth_date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        }) : 'Birth date not set';
-        
-        const card = document.createElement('div');
-        card.className = 'person-card';
-        card.innerHTML = `
+      const birthDate = p.birth_date
+        ? new Date(p.birth_date).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
+        : "Birth date not set";
+
+      const card = document.createElement("div");
+      card.className = "person-card";
+      card.innerHTML = `
             <div class="person-avatar">
                 <img src="${imageUrl(p.photo)}" 
                      alt="${escapeHtml(p.given_name)}"
-                     onerror="this.src='img/avatar-placeholder.png'"
+                     onerror="this.src='img/avatar.png'"
                      class="person-avatar-img">
             </div>
             <div class="person-info">
@@ -527,20 +503,88 @@ function displayPeople(people) {
                 </h3>
                 <p class="person-birth">${birthDate}</p>
                 <div class="person-meta">
-                    <span class="person-gender">${p.gender || 'Not specified'}</span>
-                    ${p.death_date ? '<span class="person-status deceased">Deceased</span>' : '<span class="person-status alive">Alive</span>'}
+                    <span class="person-gender">${
+                      p.gender || "Not specified"
+                    }</span>
+                    ${
+                      p.death_date
+                        ? '<span class="person-status deceased">Deceased</span>'
+                        : '<span class="person-status alive">Alive</span>'
+                    }
                 </div>
             </div>
             <div class="person-actions">
-                <button class="btn-icon" onclick="event.stopPropagation(); editPerson(${p.id})" title="Edit">✏️</button>
+                <button class="btn-icon" onclick="event.stopPropagation(); viewPerson(${
+                  p
+                })" title="View">👁</button>
             </div>
         `;
-        
-        card.onclick = () => editPerson(p.id);
-        container.appendChild(card);
+
+      // card.onclick = () => editPerson(p.id);
+      card.onclick = () => viewPerson(p);
+      container.appendChild(card);
     });
 }
+async function viewPerson(p){
+    console.log(p);
+    
+    const container = document.getElementById("personFormSectionView");
+    document.getElementById("peopleSection").classList.add("hidden");
+    container.classList.remove("hidden");
+   container.innerHTML = "";
+ 
 
+     const item = document.createElement("div");
+     item.className = "person-card";
+     item.innerHTML = `
+      <div class="person-avatar">
+                <img src="${imageUrl(p.photo)}" 
+                     alt="${escapeHtml(p.given_name)}"
+                     onerror="this.src='img/avatar.png'"
+                     class="person-avatar-img">
+            </div>
+            <div class="person-info" style="flex: 1;">
+                <h3 class="person-name">${escapeHtml(
+                  p.given_name || ""
+                )} ${escapeHtml(p.family_name || "")} - ${escapeHtml(
+       p.gender || ""
+     )}</h3>
+ ${
+   p.birth_date &&
+   `<p class="person-birth">Birth date : ${escapeHtml(p.birth_date)}</p>`
+ }
+ ${
+   p.death_date
+     ? `<p class="person-birth">Death date : ${escapeHtml(
+         p.death_date || ""
+       )}</p>`
+     : ""
+ }
+
+                ${
+                  p.birth_place
+                    ? `<p class="person-birth" style="margin-top: 0.25rem;">Birth place 📍: ${escapeHtml(
+                        p.birth_place
+                      )}</p>`
+                    : ""
+                }
+                ${
+                  p.bio
+                    ? `<p class="person-birth" style="margin-top: 0.25rem; font-size: 0.85rem;">About <strong>${
+                        p.given_name
+                      }</strong> : ${escapeHtml(p.bio)}</p>`
+                    : ""
+                }
+            </div>
+            <div class="person-actions">
+                <button class="btn-icon" onclick=editPerson(${
+                  p.id
+                }) title="Edit">📝</button>
+                
+            </div>
+        `;
+     container.appendChild(item);
+}
 async function editPerson(id) {
     try {
         const r = await fetch(`${CONFIG.API_URL}/people/${id}`, {
@@ -643,7 +687,7 @@ function resetPersonForm() {
     window.newPersonPhotoUri = null;
     document.getElementById('personForm').reset();
     document.getElementById('personId').value = '';
-    document.getElementById('personAvatar').src = 'img/avatar-placeholder.png';
+    document.getElementById('personAvatar').src = 'img/avatar.png';
 }
 
 function cancelAddEdit() {
@@ -670,7 +714,7 @@ function showAddRelationship() {
 function showViewRelationships() {
     hideAllMainSections();
     document.getElementById('relationshipsSection').classList.remove('hidden');
-    
+    document.getElementById("relationshipFormTitle").innerText="List Relationships";
     // Hide form, show list
     document.getElementById('relationshipForm').style.display = 'none';
     document.getElementById('relationshipsList').style.display = 'block';
@@ -866,7 +910,7 @@ function displayRelationships(rels) {
                 <p class="person-birth"><strong>${relType}</strong> of ${escapeHtml(r.person2_name || '')}</p>
             </div>
             <div class="person-actions">
-                <button class="btn-icon" onclick="editRelationship(${r.id})" title="Edit">✏️</button>
+                <button class="btn-icon" onclick="editRelationship(${r.id})" title="Edit">📝</button>
                 <button class="btn-icon" onclick="deleteRelationship(${r.id})" title="Delete" style="color: var(--danger);">🗑️</button>
             </div>
         `;
@@ -1116,7 +1160,7 @@ function displayEvents(events) {
                 ${ev.description ? `<p class="person-birth" style="margin-top: 0.25rem; font-size: 0.85rem;">${escapeHtml(ev.description)}</p>` : ''}
             </div>
             <div class="person-actions">
-                <button class="btn-icon" onclick="editEvent(${ev.id})" title="Edit">✏️</button>
+                <button class="btn-icon" onclick="editEvent(${ev.id})" title="Edit">📝</button>
                 <button class="btn-icon" onclick="deleteEvent(${ev.id})" title="Delete" style="color: var(--danger);">🗑️</button>
             </div>
         `;
@@ -1125,11 +1169,14 @@ function displayEvents(events) {
 }
 
 async function editEvent(id) {
+    console.log(id);
     try {
         const r = await fetch(`${CONFIG.API_URL}/events/${id}`, {
             headers: {'Authorization': `Bearer ${authToken}`}
         });
+        
         const res = await r.json();
+        console.log("res",res);
         
         if (res.success) {
             const ev = res.data;
@@ -1246,13 +1293,23 @@ function getCurrentLocation(successCb, errorCb) {
   );
 }
 
+//Marked for Delete in next version
+/*
 async function reverseGeocode(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+    console.log(lat,lng);
+    
+  const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&apiKey=73b098a774db45189daa3c4202618e68`;
   const r = await fetch(url);
   const j = await r.json();
-  return j.display_name || `${lat}, ${lng}`;
+  return (
+    `${j.features[0].properties.county} | ${j.features[0].properties.city} | ${j.features[0].properties.country}` ||
+    `${lat}, ${lng}`
+  );
 }
+*/
 
+//Old Version for Safety
+/*
 async function fillBirthPlaceFromGPS() {
   getCurrentLocation(async ({ lat, lng }) => {
     const address = await reverseGeocode(lat, lng);
@@ -1262,7 +1319,27 @@ async function fillBirthPlaceFromGPS() {
     document.getElementById("birthLng").value = lng;
   });
 }
+*/
 
+function fillBirthPlaceFromGPS() {
+  getCurrentLocation(({ lat, lng }) => {
+    const digipin = encodeDIGIPIN(lat, lng);
+
+    const latEl = document.getElementById("birthLat");
+    const lngEl = document.getElementById("birthLng");
+    const placeEl = document.getElementById("birthPlace");
+    const dpEl = document.getElementById("birthDigipin");
+
+    if (latEl) latEl.value = lat;
+    if (lngEl) lngEl.value = lng;
+    if (placeEl) placeEl.value = `DIGIPIN: ${digipin}`;
+    if (dpEl) dpEl.value = digipin;
+    
+  });
+}
+
+//Old Function
+/*
 async function fillEventPlaceFromGPS() {
   getCurrentLocation(async ({ lat, lng }) => {
     const address = await reverseGeocode(lat, lng);
@@ -1272,6 +1349,134 @@ async function fillEventPlaceFromGPS() {
     document.getElementById("eventLng").value = lng;
   });
 }
+*/
+
+function fillEventPlaceFromGPS() {
+  getCurrentLocation(({ lat, lng }) => {
+    const digipin = encodeDIGIPIN(lat, lng);
+    
+    const latEl = document.getElementById("eventLat");
+    const lngEl = document.getElementById("eventLng");
+    const placeEl = document.getElementById("eventPlace");
+    const dpEl = document.getElementById("eventDigipin");
+
+    if (latEl) latEl.value = lat;
+    if (lngEl) lngEl.value = lng;
+    if (placeEl) placeEl.value = `DIGIPIN: ${digipin}`;
+    if (dpEl) dpEl.value = digipin;
+    
+  });
+}
 
 
+/* New Updates for Galery Picker */
 
+function pickImage(options, callback) {
+    if (!navigator.camera) {
+        alert('Camera plugin not available');
+        return;
+    }
+
+    const getImage = (sourceType) => {
+        navigator.camera.getPicture(
+            uri => callback(uri),
+            err => {
+                if (err !== 'No Image Selected') {
+                    alert('Image error: ' + err);
+                }
+            },
+            {
+                quality: options.quality || 70,
+                targetWidth: options.targetWidth || 1024,
+                targetHeight: options.targetHeight || 1024,
+                destinationType: Camera.DestinationType.FILE_URI,
+                sourceType: sourceType,
+                encodingType: Camera.EncodingType.JPEG,
+                correctOrientation: true
+            }
+        );
+    };
+
+    // Ask user Camera or Gallery
+    if (navigator.notification) {
+        navigator.notification.confirm(
+            'Choose image source',
+            btn => {
+                if (btn === 1) getImage(Camera.PictureSourceType.CAMERA);
+                if (btn === 2) getImage(Camera.PictureSourceType.PHOTOLIBRARY);
+            },
+            'Photo',
+            ['Camera', 'Gallery']
+        );
+    } else {
+        // Browser fallback
+        getImage(Camera.PictureSourceType.PHOTOLIBRARY);
+    }
+}
+
+function fileUriToBase64(fileUri, callback) {
+    window.resolveLocalFileSystemURL(fileUri, entry => {
+        entry.file(file => {
+            const reader = new FileReader();
+            reader.onloadend = () => callback(reader.result);
+            reader.readAsDataURL(file);
+        });
+    });
+}
+
+function changeProfilePhoto() {
+    pickImage({}, imageURI => {
+        fileUriToBase64(imageURI, base64 => {
+            document.getElementById('profileAvatar').src = base64;
+
+            uploadImage(base64, '/users/profile-photo', res => {
+                console.log('Profile photo updated', res);
+            });
+        });
+    });
+}
+
+function changePersonPhoto() {
+    pickImage({}, imageURI => {
+        fileUriToBase64(imageURI, base64 => {
+            window.newPersonPhotoUri = base64;
+            document.getElementById('personAvatar').src = base64;
+        });
+    });
+}
+
+/*Update for Geolocation Plugin */
+
+const DIGIPIN_CHARS = "23456789CFGHJMPQRVWX";
+
+function encodeDIGIPIN(lat, lng, precision = 10) {
+  let minLat = -90, maxLat = 90;
+  let minLng = -180, maxLng = 180;
+  let pin = "";
+  let even = true;
+
+  for (let i = 0; i < precision; i++) {
+    if (even) {
+      const mid = (minLng + maxLng) / 2;
+      if (lng >= mid) {
+        pin += DIGIPIN_CHARS[1];
+        minLng = mid;
+      } else {
+        pin += DIGIPIN_CHARS[0];
+        maxLng = mid;
+      }
+    } else {
+      const mid = (minLat + maxLat) / 2;
+      if (lat >= mid) {
+        pin += DIGIPIN_CHARS[1];
+        minLat = mid;
+      } else {
+        pin += DIGIPIN_CHARS[0];
+        maxLat = mid;
+      }
+    }
+    even = !even;
+  }
+
+  return pin;
+}

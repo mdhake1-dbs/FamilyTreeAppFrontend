@@ -9,16 +9,6 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta http-equiv="Content-Security-Policy"
-          content="
-            default-src 'self' data: gap: https://ssl.gstatic.com https://familytreeapp.duckdns.org;
-            img-src 'self' data: blob: https://familytreeapp.duckdns.org;
-            style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-            font-src 'self' data: https://fonts.gstatic.com;
-            script-src 'self' 'unsafe-inline' 'unsafe-eval';
-            connect-src 'self' https://familytreeapp.duckdns.org;
-            media-src *;
-          ">
     <title>Family Tree Manager</title>
     <link rel="stylesheet" href="css/styles.css" />
   </head>
@@ -216,18 +206,10 @@
         <div id="homePage" class="section">
           <div class="home-card">
             <div class="home-icon">👨‍👩‍👧‍👦</div>
-            <h2>Welcome to Your Family Tree</h2>
+            <h2>Maintain your family tree</h2>
             <p class="home-text">
-              Build and explore your family history with ease
+              Family Tree Manager allows users to digitally create and manage their family history by adding family members, defining relationships, and recording important life events. It provides a structured, user-friendly platform to organize and preserve family information, photos, and locations.
             </p>
-            <div class="home-actions">
-              <button class="btn-primary" onclick="showAddPerson()">
-                Add Person
-              </button>
-              <button class="btn-secondary" onclick="showPeople()">
-                View People
-              </button>
-            </div>
           </div>
         </div>
 
@@ -240,7 +222,7 @@
                 <img
                   id="profileAvatar"
                   class="profile-avatar"
-                  src="img/avatar-placeholder.png"
+                  src="img/avatar.png"
                   alt="Profile"
                 />
                 <button
@@ -248,7 +230,7 @@
                   class="camera-btn"
                   onclick="changeProfilePhoto()"
                 >
-                  📷
+                  📝
                 </button>
               </div>
 
@@ -312,7 +294,7 @@
                   <img
                     id="personAvatar"
                     class="form-avatar-img"
-                    src="img/avatar-placeholder.png"
+                    src="img/avatar.png"
                     alt="Person"
                   />
                   <button
@@ -430,6 +412,9 @@
             </form>
           </div>
         </div>
+        <div id="personFormSectionView" class="section hidden">
+          <h1>ahah</h1>
+        </div>
 
         <!-- PEOPLE LIST -->
         <div id="peopleSection" class="section hidden">
@@ -501,6 +486,10 @@
 
             <div id="relationshipsList" class="list-container"></div>
           </div>
+        </div>
+
+        <div id="relationshipsSectionView" class="section hidden">
+          <h1>ahahah</h1>
         </div>
 
         <!-- EVENTS SECTION -->
@@ -594,15 +583,6 @@
             <button id="confirmNo" class="btn-secondary">No</button>
           </div>
         </div>
-      </div>
-    </div>
-    
-    <!-- Media Picker -->
-    <div id="mediaPicker" class="media-picker hidden">
-      <div class="media-sheet">
-        <button onclick="pickCamera()">📷 Camera</button>
-        <button onclick="pickGallery()">🖼 Photos</button>
-        <button class="cancel" onclick="closeMediaPicker()">Cancel</button>
       </div>
     </div>
 
