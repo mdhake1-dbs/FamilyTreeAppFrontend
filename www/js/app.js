@@ -417,7 +417,10 @@ async function onPersonFormSubmit(e) {
         gender: document.getElementById('gender').value,
         birth_date: document.getElementById('birthDate').value || null,
         death_date: status === 'deceased' ? document.getElementById('deathDate').value || null : null,
-        birth_place: document.getElementById('birthPlace').value,
+        birth_place: document.getElementById("birthPlace").value,
+
+        birth_lat: document.getElementById("birthLat").value || null,
+        birth_lng: document.getElementById("birthLng").value || null,
         bio: document.getElementById('bio').value,
         relation: ''
     };
@@ -998,7 +1001,11 @@ async function onEventFormSubmit(e) {
         return;
     }
     
-    const payload = {created_by: person_id, title, event_date, place, description};
+    const payload = {created_by: person_id, title, event_date, place: document.getElementById("eventPlace").value,
+
+  place_lat: document.getElementById("eventLat").value || null,
+  place_lng: document.getElementById("eventLng").value || null, description
+  };
     
     if (editingEventId) {
         await updateEvent(editingEventId, payload);
@@ -1214,3 +1221,57 @@ function dataURItoBlob(data) {
 
     return new Blob([ab], { type: mime });
 }
+
+function getCurrentLocation(successCb, errorCb) {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      successCb({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      });
+    },
+    err => {
+      alert("Unable to fetch location");
+      if (errorCb) errorCb(err);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000
+    }
+  );
+}
+
+async function reverseGeocode(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+  const r = await fetch(url);
+  const j = await r.json();
+  return j.display_name || `${lat}, ${lng}`;
+}
+
+async function fillBirthPlaceFromGPS() {
+  getCurrentLocation(async ({ lat, lng }) => {
+    const address = await reverseGeocode(lat, lng);
+
+    document.getElementById("birthPlace").value = address;
+    document.getElementById("birthLat").value = lat;
+    document.getElementById("birthLng").value = lng;
+  });
+}
+
+async function fillEventPlaceFromGPS() {
+  getCurrentLocation(async ({ lat, lng }) => {
+    const address = await reverseGeocode(lat, lng);
+
+    document.getElementById("eventPlace").value = address;
+    document.getElementById("eventLat").value = lat;
+    document.getElementById("eventLng").value = lng;
+  });
+}
+
+
+

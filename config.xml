@@ -21,7 +21,7 @@
     <allow-navigation href="*" />
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
-
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <platform name="android">
         <allow-intent href="market:*" />
         <preference name="AndroidPersistentFileLocation" value="Internal" />
